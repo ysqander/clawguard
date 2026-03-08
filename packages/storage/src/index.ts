@@ -1,10 +1,25 @@
-export interface StoragePaths {
-  stateDbPath: string;
-  artifactsRoot: string;
-}
+export { ArtifactStore } from "./artifact-store.js";
+export { ClawGuardStorage, createStorage } from "./database.js";
+export { STORAGE_SCHEMA_VERSION, storageMigrations } from "./migrations.js";
+export {
+  createMacosStoragePaths,
+  defaultMacosStoragePaths,
+  expandHomePath,
+  resolveStoragePaths
+} from "./paths.js";
 
-export const defaultMacosStoragePaths: StoragePaths = {
-  stateDbPath: "~/Library/Application Support/ClawGuard/state.db",
-  artifactsRoot: "~/Library/Application Support/ClawGuard/artifacts"
-};
-
+export type {
+  CreateQuarantineRecordInput,
+  ListQuarantineRecordsOptions,
+  PersistScanInput,
+  PersistStaticReportInput,
+  QuarantineRecord,
+  QuarantineState,
+  StorageApi,
+  StoragePaths,
+  StoredArtifactRecord,
+  StoredStaticReport,
+  UpsertDecisionInput,
+  WriteArtifactInput,
+  WriteJsonArtifactInput
+} from "./types.js";
