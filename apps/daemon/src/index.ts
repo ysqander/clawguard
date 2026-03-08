@@ -1,17 +1,22 @@
 import { defaultDetonationRuntime } from "@clawguard/detonation";
-import { macosPlatformAdapter } from "@clawguard/platform";
-import { defaultMacosStoragePaths } from "@clawguard/storage";
+import { createPlatformAdapter } from "@clawguard/platform";
+import { resolveStoragePaths } from "@clawguard/storage";
 
-export function startDaemon(): string {
+export async function startDaemon(): Promise<string> {
+  const platformAdapter = createPlatformAdapter();
+  const storagePaths = resolveStoragePaths();
+  const preferredRuntime = await platformAdapter.containerRuntimes.getPreferredRuntime(
+    defaultDetonationRuntime
+  );
+
   return [
     "clawguard daemon scaffold",
-    `platform=${macosPlatformAdapter.capabilities.platform}`,
-    `runtime=${defaultDetonationRuntime}`,
-    `state=${defaultMacosStoragePaths.stateDbPath}`
+    `platform=${platformAdapter.capabilities.platform}`,
+    `runtime=${preferredRuntime?.runtime ?? `${defaultDetonationRuntime} (unavailable)`}`,
+    `state=${storagePaths.stateDbPath}`
   ].join(" | ");
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  console.log(startDaemon());
+  console.log(await startDaemon());
 }
-

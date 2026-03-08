@@ -10,6 +10,7 @@
   "scripts": {
     "build": "pnpm -r --filter './packages/**' --filter './apps/**' run build",
     "typecheck": "pnpm -r --filter './packages/**' --filter './apps/**' run typecheck",
+    "test": "pnpm -r --if-present --filter './packages/**' --filter './apps/**' run test",
     "clean": "pnpm -r --filter './packages/**' --filter './apps/**' run clean",
     "dev:cli": "pnpm --filter @clawguard/cli run dev",
     "dev:daemon": "pnpm --filter @clawguard/daemon run dev"
@@ -19,4 +20,3 @@
     "typescript": "^5.9.3"
   }
 }
-
