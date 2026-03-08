@@ -4,4 +4,4 @@ dist
 .pnpm-store
 coverage
 *.log
-
+*.tsbuildinfo
