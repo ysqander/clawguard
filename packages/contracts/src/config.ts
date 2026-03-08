@@ -8,6 +8,7 @@ import {
   parseObject,
   parseStringArray
 } from "./runtime.js";
+import { detonationRuntimeKinds, type DetonationRuntimeKind } from "./domain.js";
 
 export interface PathsConfig {
   stateDbPath: string;
@@ -34,7 +35,7 @@ export interface ScanThresholdsConfig {
 
 export interface DetonationConfig {
   enabled: boolean;
-  defaultRuntime: "podman" | "docker";
+  defaultRuntime: DetonationRuntimeKind;
   timeoutSeconds: number;
   promptBudget: number;
 }
@@ -102,7 +103,7 @@ function parseScanThresholdsConfig(input: unknown, path: string): ScanThresholds
 function parseDetonationConfig(input: unknown, path: string): DetonationConfig {
   return parseObject(input, path, (record) => ({
     enabled: parseBoolean(record.enabled, `${path}.enabled`),
-    defaultRuntime: parseEnum(record.defaultRuntime, ["podman", "docker"] as const, `${path}.defaultRuntime`),
+    defaultRuntime: parseEnum(record.defaultRuntime, detonationRuntimeKinds, `${path}.defaultRuntime`),
     timeoutSeconds: parseInteger(record.timeoutSeconds, `${path}.timeoutSeconds`),
     promptBudget: parseInteger(record.promptBudget, `${path}.promptBudget`)
   }));

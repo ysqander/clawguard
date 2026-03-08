@@ -50,12 +50,18 @@ export const daemonEventTypes = [
 ] as const;
 export type DaemonEventType = (typeof daemonEventTypes)[number];
 
+export const supportedPlatforms = ["macos", "linux"] as const;
+export type SupportedPlatform = (typeof supportedPlatforms)[number];
+
+export const detonationRuntimeKinds = ["podman", "docker"] as const;
+export type DetonationRuntimeKind = (typeof detonationRuntimeKinds)[number];
+
 export interface PlatformCapabilities {
-  platform: "macos" | "linux";
+  platform: SupportedPlatform;
   supportsWatcher: boolean;
   supportsNotifications: boolean;
   supportsServiceInstall: boolean;
-  supportedDetonationRuntimes: Array<"podman" | "docker">;
+  supportedDetonationRuntimes: DetonationRuntimeKind[];
 }
 
 export interface SkillSourceHint {
