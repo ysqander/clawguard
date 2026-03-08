@@ -1,0 +1,448 @@
+# ClawGuard Ticket Breakdown
+
+This ticket plan converts the high-level implementation plan into deliverable work. Ticket IDs are placeholders; rename them to match your tracker.
+
+## Priority guide
+
+- `P0`: required for Static MVP
+- `P1`: required for Behavioral MVP
+- `P2`: launch hardening or post-MVP improvement
+
+## Epic A: Monorepo Foundation
+
+### CG-001 Initialize the monorepo and CI
+
+Priority: `P0`
+Milestone: `A`
+Depends on: none
+
+Scope:
+
+- Create `apps/` and `packages/` workspace layout.
+- Set up TypeScript project references, linting, formatting, tests, and publishable package builds.
+- Add CI for install, build, lint, and test.
+
+Acceptance criteria:
+
+- The repo builds from a clean checkout.
+- `apps/daemon` and `apps/cli` can import shared packages.
+- CI runs on every push with green placeholder checks.
+
+### CG-002 Define shared contracts and configuration schema
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-001`
+
+Scope:
+
+- Define scan, detonation, report, decision, artifact, IPC, and config types.
+- Add runtime validation for persisted data and IPC payloads.
+- Write ADRs for contracts, IPC versioning, and error taxonomy.
+
+Acceptance criteria:
+
+- All downstream packages can compile against `packages/contracts`.
+- Invalid config and malformed IPC payloads fail fast.
+- Example fixtures exist for the main contracts.
+
+### CG-003 Implement storage architecture
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-001`, `CG-002`
+
+Scope:
+
+- Create SQLite schema and migrations for structured state.
+- Create artifact-store helpers for raw evidence files.
+- Index artifacts from SQLite without storing large blobs in the database.
+
+Acceptance criteria:
+
+- A scan record can persist summary rows plus linked artifacts.
+- Quarantine and allow or block decisions survive daemon restart.
+- Artifact directories are deterministic and queryable from the DB.
+
+### CG-004 Build platform interfaces and macOS adapters
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-002`
+
+Scope:
+
+- Define interfaces for filesystem watching, notifications, service install, and container runtime detection.
+- Implement macOS adapters.
+- Add Linux contract tests and placeholder stubs without shipping Linux behavior yet.
+
+Acceptance criteria:
+
+- macOS adapters satisfy all platform contracts.
+- Core packages compile against interfaces, not direct macOS calls.
+- Linux support can be added without changing scanner or daemon contracts.
+
+## Epic B: Discovery and Interception
+
+### CG-005 Implement OpenClaw workspace discovery
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-002`, `CG-004`
+
+Scope:
+
+- Parse `~/.openclaw/openclaw.json`.
+- Fall back to `.clawhub/lock.json`, known defaults, and service checks.
+- Normalize discovered paths into a single workspace model.
+
+Acceptance criteria:
+
+- Discovery follows the priority order from the spec.
+- Missing config files degrade cleanly.
+- Tests cover the known discovery permutations.
+
+### CG-006 Implement watcher pipeline and scan scheduling
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-003`, `CG-004`, `CG-005`
+
+Scope:
+
+- Watch skill directories on macOS.
+- Debounce and coalesce file events into one scan request per skill change.
+- Emit idempotent work items for the daemon.
+
+Acceptance criteria:
+
+- Repeated file writes do not create duplicate scans.
+- New and modified skills are detected reliably.
+- The watcher can recover after transient filesystem errors.
+
+### CG-007 Implement quarantine, allow, and block lifecycle
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-003`, `CG-005`
+
+Scope:
+
+- Rename suspicious skills into quarantine.
+- Store allowlist and blocklist decisions by content hash.
+- Restore or delete skills through explicit operator action.
+
+Acceptance criteria:
+
+- Quarantine is non-destructive and reversible.
+- A hash-allowed skill bypasses repeat quarantine until content changes.
+- A blocked hash is rejected on reappearance.
+
+## Epic C: Static Scanner and Intelligence
+
+### CG-008 Build skill snapshot and parser integration
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-002`, `CG-005`
+
+Scope:
+
+- Walk skill directories, hash contents, and inventory files.
+- Parse `SKILL.md` and any available manifest data.
+- Emit normalized `SkillSnapshot` objects for scanning.
+
+Acceptance criteria:
+
+- The same skill contents always produce the same content hash.
+- Snapshot output includes file inventory and parsed metadata.
+- Corrupt or partial skills return structured errors, not crashes.
+
+### CG-009 Implement static rule engine and scoring
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-008`
+
+Scope:
+
+- Implement rules for exfiltration, prompt injection, memory tampering, privilege escalation, obfuscation, and staged download chains.
+- Add rule metadata, severity, evidence capture, and explanation strings.
+- Build the first risk score and quarantine recommendation model.
+
+Acceptance criteria:
+
+- Each finding includes rule ID, evidence, and human-readable reasoning.
+- Staged-download fixtures are flagged by dedicated logic.
+- Rule tests cover both malicious and benign examples.
+
+### CG-010 Implement ClawHub API client
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-002`
+
+Scope:
+
+- Integrate `GET /api/v1/skills/{slug}`.
+- Integrate `GET /api/v1/skills/{slug}/file?path=SKILL.md`.
+- Integrate `GET /api/v1/skills?sort=trending|installs|recent`.
+- Normalize any exposed ClawHub or VirusTotal verdict fields.
+
+Acceptance criteria:
+
+- The client can enrich a local scan with marketplace metadata.
+- Remote `SKILL.md` retrieval works for slug-based audits.
+- Missing verdict fields degrade to neutral rather than error.
+
+### CG-011 Implement VirusTotal client, caching, and quota control
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-002`, `CG-003`
+
+Scope:
+
+- Integrate file-hash lookup via `GET /api/v3/files/{hash}`.
+- Integrate async upload via `POST /api/v3/files` and `GET /api/v3/analyses/{id}`.
+- Integrate URL, domain, and search endpoints for enrichment.
+- Add caching, deduplication, and rate-budget enforcement.
+
+Acceptance criteria:
+
+- Hash lookups are usable on the blocking scan path.
+- Uploads never block install-time decisions.
+- Rate-limit exhaustion degrades cleanly and visibly.
+
+### CG-012 Implement static report synthesis
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-003`, `CG-009`, `CG-010`, `CG-011`
+
+Scope:
+
+- Merge local findings, ClawHub metadata, and VirusTotal hash verdicts.
+- Persist report summaries and artifact references.
+- Render plain-language static reports for CLI and notifications.
+
+Acceptance criteria:
+
+- Reports explain why a skill was allowed or quarantined.
+- ClawHub and VirusTotal signals appear as enrichment, not as sole verdicts.
+- Stored reports can be loaded later by slug or hash.
+
+## Epic D: Detonation Runtime
+
+### CG-013 Build Podman runtime provider and sandbox image
+
+Priority: `P1`
+Milestone: `B`
+Depends on: `CG-002`, `CG-004`
+
+Scope:
+
+- Implement Podman runtime detection and command adapter.
+- Build the base sandbox image and cache strategy.
+- Add Docker provider parity through the same runtime contract.
+
+Acceptance criteria:
+
+- Podman is the default runtime when both are present.
+- The sandbox image can be built or pulled repeatably.
+- Docker compatibility passes the same contract tests.
+
+### CG-014 Build dummy OpenClaw environment and honeypots
+
+Priority: `P1`
+Milestone: `B`
+Depends on: `CG-013`
+
+Scope:
+
+- Create a minimal agent environment inside the sandbox.
+- Seed realistic decoy credentials and baseline memory files.
+- Mount skill fixtures and workspace state consistently.
+
+Acceptance criteria:
+
+- Honeypot files are visible to detonated skills.
+- Baseline memory files can be diffed after execution.
+- The environment is deterministic enough for regression tests.
+
+### CG-015 Implement prompt runner for staged-download workflows
+
+Priority: `P1`
+Milestone: `B`
+Depends on: `CG-014`
+
+Scope:
+
+- Execute 3 to 5 prompts that exercise declared skill capabilities.
+- Follow setup, fetch, install, or initialization instructions called out in `SKILL.md`.
+- Record tool-call intent and execution sequence.
+
+Acceptance criteria:
+
+- Workflow-malware fixtures trigger follow-on downloads or commands in the sandbox.
+- Passive skills can still be detonated without false activation.
+- Prompt execution is reproducible enough for test assertions.
+
+### CG-016 Implement detonation telemetry capture and VT enrichment
+
+Priority: `P1`
+Milestone: `B`
+Depends on: `CG-011`, `CG-014`, `CG-015`
+
+Scope:
+
+- Capture process execution, network activity, file access, and memory diffs.
+- Persist raw artifacts and normalized telemetry events.
+- Enrich observed domains, URLs, IPs, and hashes through VirusTotal lookups.
+
+Acceptance criteria:
+
+- Reports can show what connected where and what files were touched.
+- Network indicators can be enriched without blocking detonation completion.
+- Raw artifacts are preserved for later review.
+
+## Epic E: Daemon and CLI
+
+### CG-017 Implement daemon job orchestration and IPC
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-006`, `CG-007`, `CG-012`
+
+Scope:
+
+- Build the daemon process, queue, retries, and backpressure rules.
+- Expose a Unix socket API.
+- Connect watcher-triggered scans to quarantine and report persistence.
+
+Acceptance criteria:
+
+- The daemon survives restart without losing persisted decisions.
+- Concurrent scan requests are serialized or deduplicated safely.
+- CLI clients can query daemon status and reports over IPC.
+
+### CG-018 Implement CLI commands and output formatting
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-007`, `CG-012`, `CG-017`
+
+Scope:
+
+- Implement `report`, `allow`, `block`, `scan`, `detonate`, `status`, and `audit`.
+- Format terminal output for both concise and detailed reports.
+- Handle daemon-unavailable and runtime-unavailable cases cleanly.
+
+Acceptance criteria:
+
+- All spec commands work end-to-end against daemon-backed state.
+- Operators can review and resolve quarantine decisions from the CLI.
+- Error messages are actionable and non-ambiguous.
+
+### CG-019 Implement macOS notifications and launchd service setup
+
+Priority: `P1`
+Milestone: `C`
+Depends on: `CG-004`, `CG-017`, `CG-018`
+
+Scope:
+
+- Add notification delivery for quarantines and completed scans.
+- Add `launchd` user-service install, status, and uninstall flows.
+- Surface daemon health in the CLI.
+
+Acceptance criteria:
+
+- New quarantines generate a visible local notification.
+- The daemon can be installed as a user service and restarted automatically.
+- Service status is queryable from the CLI.
+
+## Epic F: Quality, Benchmarks, and Launch
+
+### CG-020 Build fixture corpus and benchmark harness
+
+Priority: `P0`
+Milestone: `A`
+Depends on: `CG-001`
+
+Scope:
+
+- Create benign and malicious skill fixtures.
+- Include staged-download, memory-poisoning, and exfiltration examples.
+- Add performance harnesses for static and detonation targets.
+
+Acceptance criteria:
+
+- Fixtures are reusable across unit, integration, and end-to-end tests.
+- Static benchmark output is automated in CI or a gated local workflow.
+- Fixture coverage includes high-quality benign skills to track false positives.
+
+### CG-021 Implement end-to-end regression and security validation
+
+Priority: `P1`
+Milestone: `B`
+Depends on: `CG-016`, `CG-017`, `CG-018`, `CG-020`
+
+Scope:
+
+- Add full pipeline tests from install detection to report generation.
+- Validate quarantine safety, artifact integrity, and detonation containment assumptions.
+- Track false-positive and latency regressions over time.
+
+Acceptance criteria:
+
+- The main static and detonation flows are covered end to end.
+- Benchmark regressions are visible before release.
+- Security validation results are recorded in repeatable test outputs.
+
+### CG-022 Package release flow and launch docs
+
+Priority: `P2`
+Milestone: `C`
+Depends on: `CG-018`, `CG-019`, `CG-021`
+
+Scope:
+
+- Finalize npm packaging, versioning, and release automation.
+- Write operator docs, architecture docs, and security caveat docs.
+- Prepare demo scenarios and launch assets.
+
+Acceptance criteria:
+
+- A release build can be installed and run from a clean machine.
+- Docs clearly explain scope limits, Podman default, and VirusTotal caveats.
+- Demo assets show both static detection and workflow-malware detonation.
+
+## Recommended ticket order
+
+Start with:
+
+- `CG-001`
+- `CG-002`
+- `CG-020`
+
+Then run in parallel:
+
+- `CG-003`
+- `CG-004`
+- `CG-005`
+- `CG-008`
+- `CG-010`
+
+Static MVP critical path:
+
+- `CG-006` -> `CG-007` -> `CG-009` -> `CG-011` -> `CG-012` -> `CG-017` -> `CG-018`
+
+Behavioral MVP critical path:
+
+- `CG-013` -> `CG-014` -> `CG-015` -> `CG-016` -> `CG-021`
+
+Launch candidate closeout:
+
+- `CG-019`
+- `CG-022`

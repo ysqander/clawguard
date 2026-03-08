@@ -1,0 +1,23 @@
+{
+  "name": "@clawguard/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "clawguard": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b --pretty false",
+    "clean": "tsc -b --clean",
+    "dev": "node --enable-source-maps ./dist/index.js"
+  },
+  "dependencies": {
+    "@clawguard/contracts": "workspace:*",
+    "@clawguard/reports": "workspace:*",
+    "@clawguard/scanner": "workspace:*"
+  }
+}
+

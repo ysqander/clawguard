@@ -1,0 +1,22 @@
+{
+  "name": "clawguard",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local-first skill auditor for OpenClaw agents",
+  "packageManager": "pnpm@10.19.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter './packages/**' --filter './apps/**' run build",
+    "typecheck": "pnpm -r --filter './packages/**' --filter './apps/**' run typecheck",
+    "clean": "pnpm -r --filter './packages/**' --filter './apps/**' run clean",
+    "dev:cli": "pnpm --filter @clawguard/cli run dev",
+    "dev:daemon": "pnpm --filter @clawguard/daemon run dev"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "typescript": "^5.9.3"
+  }
+}
+

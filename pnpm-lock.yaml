@@ -1,0 +1,134 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.6.0
+        version: 24.12.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  apps/cli:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@clawguard/reports':
+        specifier: workspace:*
+        version: link:../../packages/reports
+      '@clawguard/scanner':
+        specifier: workspace:*
+        version: link:../../packages/scanner
+
+  apps/daemon:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@clawguard/detonation':
+        specifier: workspace:*
+        version: link:../../packages/detonation
+      '@clawguard/discovery':
+        specifier: workspace:*
+        version: link:../../packages/discovery
+      '@clawguard/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
+      '@clawguard/reports':
+        specifier: workspace:*
+        version: link:../../packages/reports
+      '@clawguard/scanner':
+        specifier: workspace:*
+        version: link:../../packages/scanner
+      '@clawguard/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+
+  packages/contracts: {}
+
+  packages/detonation:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@clawguard/platform':
+        specifier: workspace:*
+        version: link:../platform
+
+  packages/discovery:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@clawguard/platform':
+        specifier: workspace:*
+        version: link:../platform
+
+  packages/fixtures:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
+  packages/integrations:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
+  packages/platform:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
+  packages/reports:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
+  packages/scanner:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@clawguard/integrations':
+        specifier: workspace:*
+        version: link:../integrations
+
+  packages/storage:
+    dependencies:
+      '@clawguard/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+
+packages:
+
+  '@types/node@24.12.0':
+    resolution: {integrity: sha512-GYDxsZi3ChgmckRT9HPU0WEhKLP08ev/Yfcq2AstjrDASOYCSXeyjDsHg4v5t4jOj7cyDX3vmprafKlWIG9MXQ==}
+
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
+  undici-types@7.16.0:
+    resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
+
+snapshots:
+
+  '@types/node@24.12.0':
+    dependencies:
+      undici-types: 7.16.0
+
+  typescript@5.9.3: {}
+
+  undici-types@7.16.0: {}

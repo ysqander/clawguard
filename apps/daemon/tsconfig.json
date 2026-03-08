@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/contracts" },
+    { "path": "../../packages/discovery" },
+    { "path": "../../packages/detonation" },
+    { "path": "../../packages/platform" },
+    { "path": "../../packages/reports" },
+    { "path": "../../packages/scanner" },
+    { "path": "../../packages/storage" }
+  ]
+}
+
