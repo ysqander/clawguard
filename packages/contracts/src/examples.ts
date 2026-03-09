@@ -3,7 +3,11 @@ import type {
   ArtifactRef,
   DaemonEvent,
   DecisionRecord,
+  DiscoveredSkillRoot,
+  DiscoveredWorkspace,
   DetonationReport,
+  GatewayServiceSignal,
+  OpenClawWorkspaceModel,
   ReportSummary,
   ScanRecord,
   SkillSnapshot,
@@ -22,6 +26,43 @@ export const exampleSkillSnapshot: SkillSnapshot = {
   contentHash: "sha256:example",
   fileInventory: ["SKILL.md", "scripts/install.sh"],
   detectedAt: "2026-03-08T00:00:00.000Z"
+};
+
+export const exampleDiscoveredWorkspace: DiscoveredWorkspace = {
+  id: "default",
+  workspacePath: "/Users/tester/.openclaw/workspace",
+  skillsPath: "/Users/tester/.openclaw/workspace/skills",
+  source: "config",
+  exists: true,
+  precedence: 100,
+  agentName: "default",
+  isPrimary: true
+};
+
+export const exampleDiscoveredSkillRoot: DiscoveredSkillRoot = {
+  path: "/Users/tester/.openclaw/skills",
+  kind: "managed",
+  source: "config",
+  exists: true,
+  precedence: 90
+};
+
+export const exampleGatewayServiceSignal: GatewayServiceSignal = {
+  source: "service",
+  command: "openclaw gateway status --no-probe --json",
+  installed: true,
+  running: true,
+  checkedAt: "2026-03-08T00:00:00.000Z",
+  detail: "Gateway reported active."
+};
+
+export const exampleOpenClawWorkspaceModel: OpenClawWorkspaceModel = {
+  configPath: "/Users/tester/.openclaw/openclaw.json",
+  primaryWorkspaceId: "default",
+  workspaces: [exampleDiscoveredWorkspace],
+  skillRoots: [exampleDiscoveredSkillRoot],
+  serviceSignals: [exampleGatewayServiceSignal],
+  warnings: []
 };
 
 export const exampleStaticScanReport: StaticScanReport = {
@@ -130,6 +171,7 @@ export const exampleDaemonResponseEnvelope: DaemonResponseEnvelope = {
 
 export const exampleContracts = {
   config: defaultClawGuardConfig,
+  openClawWorkspaceModel: exampleOpenClawWorkspaceModel,
   skillSnapshot: exampleSkillSnapshot,
   staticScanReport: exampleStaticScanReport,
   threatIntelVerdict: exampleThreatIntelVerdict,
@@ -142,4 +184,3 @@ export const exampleContracts = {
   daemonRequestEnvelope: exampleDaemonRequestEnvelope,
   daemonResponseEnvelope: exampleDaemonResponseEnvelope
 };
-

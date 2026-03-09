@@ -1,6 +1,7 @@
 import {
   createValidator,
   parseArray,
+  parseBoolean,
   parseEnum,
   parseInteger,
   parseIsoDateTime,
@@ -56,6 +57,12 @@ export type SupportedPlatform = (typeof supportedPlatforms)[number];
 export const detonationRuntimeKinds = ["podman", "docker"] as const;
 export type DetonationRuntimeKind = (typeof detonationRuntimeKinds)[number];
 
+export const workspaceDiscoverySourceKinds = ["config", "lockfile", "default"] as const;
+export type WorkspaceDiscoverySourceKind = (typeof workspaceDiscoverySourceKinds)[number];
+
+export const discoveredSkillRootKinds = ["workspace", "managed", "extra", "fallback"] as const;
+export type DiscoveredSkillRootKind = (typeof discoveredSkillRootKinds)[number];
+
 export interface PlatformCapabilities {
   platform: SupportedPlatform;
   supportsWatcher: boolean;
@@ -67,6 +74,44 @@ export interface PlatformCapabilities {
 export interface SkillSourceHint {
   kind: SkillSourceKind;
   detail: string;
+}
+
+export interface DiscoveredWorkspace {
+  id: string;
+  workspacePath: string;
+  skillsPath: string;
+  source: WorkspaceDiscoverySourceKind;
+  exists: boolean;
+  precedence: number;
+  agentName?: string;
+  isPrimary?: boolean;
+}
+
+export interface DiscoveredSkillRoot {
+  path: string;
+  kind: DiscoveredSkillRootKind;
+  source: WorkspaceDiscoverySourceKind;
+  exists: boolean;
+  precedence: number;
+  workspaceId?: string;
+}
+
+export interface GatewayServiceSignal {
+  source: "service";
+  command: string;
+  installed: boolean;
+  running: boolean;
+  checkedAt: string;
+  detail?: string;
+}
+
+export interface OpenClawWorkspaceModel {
+  configPath: string;
+  primaryWorkspaceId?: string;
+  workspaces: DiscoveredWorkspace[];
+  skillRoots: DiscoveredSkillRoot[];
+  serviceSignals: GatewayServiceSignal[];
+  warnings: string[];
 }
 
 export interface SkillSnapshot {
@@ -177,6 +222,77 @@ function parseSkillSourceHint(input: unknown, path: string): SkillSourceHint {
     kind: parseEnum(record.kind, skillSourceKinds, `${path}.kind`),
     detail: parseNonEmptyString(record.detail, `${path}.detail`)
   }));
+}
+
+function parseDiscoveredWorkspace(input: unknown, path: string): DiscoveredWorkspace {
+  return parseObject(input, path, (record) => {
+    const agentName = parseOptional(record.agentName, parseNonEmptyString, `${path}.agentName`);
+    const isPrimary = parseOptional(record.isPrimary, parseBoolean, `${path}.isPrimary`);
+
+    return {
+      id: parseNonEmptyString(record.id, `${path}.id`),
+      workspacePath: parseNonEmptyString(record.workspacePath, `${path}.workspacePath`),
+      skillsPath: parseNonEmptyString(record.skillsPath, `${path}.skillsPath`),
+      source: parseEnum(record.source, workspaceDiscoverySourceKinds, `${path}.source`),
+      exists: parseBoolean(record.exists, `${path}.exists`),
+      precedence: parseInteger(record.precedence, `${path}.precedence`),
+      ...(agentName !== undefined ? { agentName } : {}),
+      ...(isPrimary !== undefined ? { isPrimary } : {})
+    };
+  });
+}
+
+function parseDiscoveredSkillRoot(input: unknown, path: string): DiscoveredSkillRoot {
+  return parseObject(input, path, (record) => {
+    const workspaceId = parseOptional(record.workspaceId, parseNonEmptyString, `${path}.workspaceId`);
+
+    return {
+      path: parseNonEmptyString(record.path, `${path}.path`),
+      kind: parseEnum(record.kind, discoveredSkillRootKinds, `${path}.kind`),
+      source: parseEnum(record.source, workspaceDiscoverySourceKinds, `${path}.source`),
+      exists: parseBoolean(record.exists, `${path}.exists`),
+      precedence: parseInteger(record.precedence, `${path}.precedence`),
+      ...(workspaceId !== undefined ? { workspaceId } : {})
+    };
+  });
+}
+
+function parseGatewayServiceSignal(input: unknown, path: string): GatewayServiceSignal {
+  return parseObject(input, path, (record) => {
+    const detail = parseOptional(record.detail, parseNonEmptyString, `${path}.detail`);
+
+    return {
+      source: parseEnum(record.source, ["service"] as const, `${path}.source`),
+      command: parseNonEmptyString(record.command, `${path}.command`),
+      installed: parseBoolean(record.installed, `${path}.installed`),
+      running: parseBoolean(record.running, `${path}.running`),
+      checkedAt: parseIsoDateTime(record.checkedAt, `${path}.checkedAt`),
+      ...(detail !== undefined ? { detail } : {})
+    };
+  });
+}
+
+function parseOpenClawWorkspaceModel(input: unknown, path: string): OpenClawWorkspaceModel {
+  return parseObject(input, path, (record) => {
+    const primaryWorkspaceId = parseOptional(
+      record.primaryWorkspaceId,
+      parseNonEmptyString,
+      `${path}.primaryWorkspaceId`
+    );
+
+    return {
+      configPath: parseNonEmptyString(record.configPath, `${path}.configPath`),
+      ...(primaryWorkspaceId !== undefined ? { primaryWorkspaceId } : {}),
+      workspaces: parseArray(record.workspaces, parseDiscoveredWorkspace, `${path}.workspaces`),
+      skillRoots: parseArray(record.skillRoots, parseDiscoveredSkillRoot, `${path}.skillRoots`),
+      serviceSignals: parseArray(
+        record.serviceSignals,
+        parseGatewayServiceSignal,
+        `${path}.serviceSignals`
+      ),
+      warnings: parseStringArray(record.warnings, `${path}.warnings`)
+    };
+  });
 }
 
 function parseSkillSnapshot(input: unknown, path: string): SkillSnapshot {
@@ -340,6 +456,22 @@ function parseDaemonEvent(input: unknown, path: string): DaemonEvent {
 }
 
 export const skillSnapshotValidator = createValidator(parseSkillSnapshot, "SkillSnapshot");
+export const discoveredWorkspaceValidator = createValidator(
+  parseDiscoveredWorkspace,
+  "DiscoveredWorkspace"
+);
+export const discoveredSkillRootValidator = createValidator(
+  parseDiscoveredSkillRoot,
+  "DiscoveredSkillRoot"
+);
+export const gatewayServiceSignalValidator = createValidator(
+  parseGatewayServiceSignal,
+  "GatewayServiceSignal"
+);
+export const openClawWorkspaceModelValidator = createValidator(
+  parseOpenClawWorkspaceModel,
+  "OpenClawWorkspaceModel"
+);
 export const staticFindingValidator = createValidator(parseStaticFinding, "StaticFinding");
 export const staticScanReportValidator = createValidator(parseStaticScanReport, "StaticScanReport");
 export const threatIntelVerdictValidator = createValidator(parseThreatIntelVerdict, "ThreatIntelVerdict");

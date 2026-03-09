@@ -19,6 +19,7 @@ export interface PathsConfig {
 
 export interface DiscoveryConfig {
   openClawConfigPath: string;
+  managedSkillsPath: string;
   fallbackSkillDirs: string[];
 }
 
@@ -81,6 +82,7 @@ function parsePathsConfig(input: unknown, path: string): PathsConfig {
 function parseDiscoveryConfig(input: unknown, path: string): DiscoveryConfig {
   return parseObject(input, path, (record) => ({
     openClawConfigPath: parseNonEmptyString(record.openClawConfigPath, `${path}.openClawConfigPath`),
+    managedSkillsPath: parseNonEmptyString(record.managedSkillsPath, `${path}.managedSkillsPath`),
     fallbackSkillDirs: parseStringArray(record.fallbackSkillDirs, `${path}.fallbackSkillDirs`)
   }));
 }
@@ -156,7 +158,8 @@ export const defaultClawGuardConfig: ClawGuardConfig = {
   },
   discovery: {
     openClawConfigPath: "~/.openclaw/openclaw.json",
-    fallbackSkillDirs: ["~/.openclaw/skills", "~/openclaw/skills", "./skills"]
+    managedSkillsPath: "~/.openclaw/skills",
+    fallbackSkillDirs: ["~/openclaw/skills", "./skills"]
   },
   daemon: {
     debounceMs: 500,
