@@ -1,12 +1,6 @@
-import {
-  detonationRuntimeKinds,
-  type DetonationRuntimeKind
-} from "@clawguard/contracts";
+import { detonationRuntimeKinds, type DetonationRuntimeKind } from "@clawguard/contracts";
 
-import type {
-  ContainerRuntimeDetector,
-  DetectedContainerRuntime
-} from "../types.js";
+import type { ContainerRuntimeDetector, DetectedContainerRuntime } from "../types.js";
 import type { CommandRunner } from "./command-runner.js";
 
 export interface RuntimeDetectorOptions {
@@ -15,18 +9,22 @@ export interface RuntimeDetectorOptions {
 }
 
 export function createContainerRuntimeDetector(
-  options: RuntimeDetectorOptions
+  options: RuntimeDetectorOptions,
 ): ContainerRuntimeDetector {
   return {
     async detectAvailableRuntimes() {
       const runtimes = await Promise.all(
         detonationRuntimeKinds.map(async (runtime) =>
-          detectRuntime(runtime, resolveRuntimeCommand(runtime, options.commandOverrides), options.commandRunner)
-        )
+          detectRuntime(
+            runtime,
+            resolveRuntimeCommand(runtime, options.commandOverrides),
+            options.commandRunner,
+          ),
+        ),
       );
 
       return runtimes.filter(
-        (runtime): runtime is DetectedContainerRuntime => runtime !== undefined
+        (runtime): runtime is DetectedContainerRuntime => runtime !== undefined,
       );
     },
 
@@ -35,7 +33,7 @@ export function createContainerRuntimeDetector(
 
       if (preferredRuntime !== undefined) {
         const preferredMatch = availableRuntimes.find(
-          (runtime) => runtime.runtime === preferredRuntime
+          (runtime) => runtime.runtime === preferredRuntime,
         );
         if (preferredMatch !== undefined) {
           return preferredMatch;
@@ -43,14 +41,14 @@ export function createContainerRuntimeDetector(
       }
 
       return availableRuntimes[0];
-    }
+    },
   };
 }
 
 async function detectRuntime(
   runtime: DetonationRuntimeKind,
   command: string,
-  commandRunner: CommandRunner
+  commandRunner: CommandRunner,
 ): Promise<DetectedContainerRuntime | undefined> {
   try {
     const result = await commandRunner.run(command, ["--version"]);
@@ -63,7 +61,7 @@ async function detectRuntime(
     return {
       runtime,
       command,
-      ...(version !== undefined ? { version } : {})
+      ...(version !== undefined ? { version } : {}),
     };
   } catch {
     return undefined;
@@ -72,7 +70,7 @@ async function detectRuntime(
 
 function resolveRuntimeCommand(
   runtime: DetonationRuntimeKind,
-  overrides?: Partial<Record<DetonationRuntimeKind, string>>
+  overrides?: Partial<Record<DetonationRuntimeKind, string>>,
 ): string {
   return overrides?.[runtime] ?? runtime;
 }

@@ -6,5 +6,5 @@ export const placeholderFixture: SkillSnapshot = {
   sourceHints: [{ kind: "fixture", detail: "Placeholder fixture for schema wiring" }],
   contentHash: "placeholder",
   fileInventory: ["SKILL.md"],
-  detectedAt: "2026-03-08T00:00:00.000Z"
+  detectedAt: "2026-03-08T00:00:00.000Z",
 };

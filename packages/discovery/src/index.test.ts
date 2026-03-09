@@ -26,25 +26,31 @@ test("discovers a JSON5 config workspace, managed root, and extra dirs", async (
           extraDirs: ["./shared-skills"],
         },
       },
-    }`
+    }`,
   );
 
   const model = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: true, running: false })
+    runCommand: createStatusCommand({ installed: true, running: false }),
   });
 
   assert.equal(model.primaryWorkspaceId, "default");
   assert.deepEqual(
     model.workspaces.map((workspace) => workspace.id),
-    ["default"]
+    ["default"],
   );
-  assert.equal(findSkillRoot(model, path.join(sandbox.homeDir, "workspace-a", "skills"))?.kind, "workspace");
-  assert.equal(findSkillRoot(model, path.join(sandbox.homeDir, ".openclaw", "skills"))?.kind, "managed");
+  assert.equal(
+    findSkillRoot(model, path.join(sandbox.homeDir, "workspace-a", "skills"))?.kind,
+    "workspace",
+  );
+  assert.equal(
+    findSkillRoot(model, path.join(sandbox.homeDir, ".openclaw", "skills"))?.kind,
+    "managed",
+  );
   assert.equal(
     findSkillRoot(model, path.join(sandbox.homeDir, ".openclaw", "shared-skills"))?.kind,
-    "extra"
+    "extra",
   );
   assert.equal(model.warnings.length, 0);
 });
@@ -69,7 +75,7 @@ test("supports includes, sibling overrides, and multi-agent workspaces", async (
           extraDirs: ["./included-extra"],
         },
       },
-    }`
+    }`,
   );
   await writeTextFile(
     path.join(sandbox.homeDir, ".openclaw", "openclaw.json"),
@@ -84,25 +90,25 @@ test("supports includes, sibling overrides, and multi-agent workspaces", async (
           { name: "shared" },
         ],
       },
-    }`
+    }`,
   );
 
   const model = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: true, running: true, status: "running" })
+    runCommand: createStatusCommand({ installed: true, running: true, status: "running" }),
   });
 
   assert.equal(model.primaryWorkspaceId, "default");
   assert.deepEqual(
     model.workspaces.map((workspace) => workspace.id),
-    ["default", "agent:ops", "agent:shared"]
+    ["default", "agent:ops", "agent:shared"],
   );
   assert.equal(model.workspaces[0]?.workspacePath, path.join(sandbox.homeDir, "workspace-main"));
   assert.equal(model.workspaces[2]?.workspacePath, path.join(sandbox.homeDir, "workspace-main"));
   assert.equal(
     findSkillRoot(model, path.join(sandbox.homeDir, ".openclaw", "included-extra"))?.kind,
-    "extra"
+    "extra",
   );
   assert.equal(model.serviceSignals[0]?.running, true);
 });
@@ -114,13 +120,13 @@ test("falls back when includes are missing or circular", async (t) => {
     path.join(sandbox.homeDir, ".openclaw", "openclaw.json"),
     `{
       $include: "./missing.json5",
-    }`
+    }`,
   );
 
   const missingIncludeModel = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: false, running: false })
+    runCommand: createStatusCommand({ installed: false, running: false }),
   });
 
   assert.equal(missingIncludeModel.primaryWorkspaceId, "fallback:0");
@@ -130,25 +136,25 @@ test("falls back when includes are missing or circular", async (t) => {
     path.join(sandbox.homeDir, ".openclaw", "a.json5"),
     `{
       $include: "./b.json5",
-    }`
+    }`,
   );
   await writeTextFile(
     path.join(sandbox.homeDir, ".openclaw", "b.json5"),
     `{
       $include: "./a.json5",
-    }`
+    }`,
   );
   await writeTextFile(
     path.join(sandbox.homeDir, ".openclaw", "openclaw.json"),
     `{
       $include: "./a.json5",
-    }`
+    }`,
   );
 
   const circularModel = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: false, running: false })
+    runCommand: createStatusCommand({ installed: false, running: false }),
   });
 
   assert.equal(circularModel.primaryWorkspaceId, "fallback:0");
@@ -162,13 +168,13 @@ test("rejects includes that escape the root directory or exceed the nesting limi
     path.join(sandbox.homeDir, ".openclaw", "openclaw.json"),
     `{
       $include: "../outside.json5",
-    }`
+    }`,
   );
 
   const escapedModel = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: false, running: false })
+    runCommand: createStatusCommand({ installed: false, running: false }),
   });
 
   assert.equal(escapedModel.primaryWorkspaceId, "fallback:0");
@@ -176,20 +182,23 @@ test("rejects includes that escape the root directory or exceed the nesting limi
 
   for (let index = 0; index <= 10; index += 1) {
     const filePath = path.join(sandbox.homeDir, ".openclaw", `depth-${index}.json5`);
-    const nextInclude = index === 10 ? "{ agents: { defaults: { workspace: \"~/too-deep\" } } }" : `{ $include: "./depth-${index + 1}.json5" }`;
+    const nextInclude =
+      index === 10
+        ? '{ agents: { defaults: { workspace: "~/too-deep" } } }'
+        : `{ $include: "./depth-${index + 1}.json5" }`;
     await writeTextFile(filePath, nextInclude);
   }
   await writeTextFile(
     path.join(sandbox.homeDir, ".openclaw", "openclaw.json"),
     `{
       $include: "./depth-0.json5",
-    }`
+    }`,
   );
 
   const depthModel = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: false, running: false })
+    runCommand: createStatusCommand({ installed: false, running: false }),
   });
 
   assert.equal(depthModel.primaryWorkspaceId, "fallback:0");
@@ -205,7 +214,7 @@ test("uses cwd lockfiles when config discovery yields no workspaces", async (t) 
   const model = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: false, running: false })
+    runCommand: createStatusCommand({ installed: false, running: false }),
   });
 
   assert.equal(model.primaryWorkspaceId, "lockfile:0");
@@ -221,13 +230,13 @@ test("continues scanning lockfile candidates after a malformed lockfile", async 
   await writeTextFile(path.join(sandbox.cwd, ".clawhub", "lock.json"), `{"broken":`);
   await writeTextFile(
     path.join(sandbox.homeDir, "openclaw", ".clawhub", "lock.json"),
-    `{"version":1}`
+    `{"version":1}`,
   );
 
   const model = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: false, running: false })
+    runCommand: createStatusCommand({ installed: false, running: false }),
   });
 
   assert.equal(model.primaryWorkspaceId, "lockfile:0");
@@ -243,15 +252,18 @@ test("falls back to configured skill dirs when config and lockfiles are absent",
   const model = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: false, running: false })
+    runCommand: createStatusCommand({ installed: false, running: false }),
   });
 
   assert.deepEqual(
     model.workspaces.map((workspace) => workspace.id),
-    ["fallback:0", "fallback:1"]
+    ["fallback:0", "fallback:1"],
   );
   assert.equal(model.primaryWorkspaceId, "fallback:0");
-  assert.equal(findSkillRoot(model, path.join(sandbox.homeDir, "openclaw", "skills"))?.kind, "fallback");
+  assert.equal(
+    findSkillRoot(model, path.join(sandbox.homeDir, "openclaw", "skills"))?.kind,
+    "fallback",
+  );
   assert.equal(findSkillRoot(model, path.join(sandbox.cwd, "skills"))?.kind, "fallback");
 });
 
@@ -272,13 +284,13 @@ test("deduplicates overlapping roots and preserves the strongest metadata", asyn
           extraDirs: ["~/.openclaw/skills"],
         },
       },
-    }`
+    }`,
   );
 
   const model = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: false, running: false })
+    runCommand: createStatusCommand({ installed: false, running: false }),
   });
   const managedRoot = findSkillRoot(model, path.join(sandbox.homeDir, ".openclaw", "skills"));
 
@@ -297,13 +309,13 @@ test("marks missing configured paths as non-existent instead of crashing", async
           workspace: "~/missing-workspace",
         },
       },
-    }`
+    }`,
   );
 
   const model = await discoverOpenClawWorkspaceModel({
     homeDir: sandbox.homeDir,
     cwd: sandbox.cwd,
-    runCommand: createStatusCommand({ installed: false, running: false })
+    runCommand: createStatusCommand({ installed: false, running: false }),
   });
 
   assert.equal(model.primaryWorkspaceId, "default");
@@ -322,7 +334,7 @@ test("records service probe warnings without changing path discovery", async (t)
           workspace: "~/workspace-a",
         },
       },
-    }`
+    }`,
   );
 
   const missingCommandModel = await discoverOpenClawWorkspaceModel({
@@ -330,7 +342,7 @@ test("records service probe warnings without changing path discovery", async (t)
     cwd: sandbox.cwd,
     runCommand: async () => {
       throw new Error("spawn openclaw ENOENT");
-    }
+    },
   });
 
   assert.equal(missingCommandModel.primaryWorkspaceId, "default");
@@ -345,8 +357,8 @@ test("records service probe warnings without changing path discovery", async (t)
       args: ["gateway", "status"],
       exitCode: 0,
       stdout: "{invalid json",
-      stderr: ""
-    })
+      stderr: "",
+    }),
   });
 
   assert.equal(badJsonModel.primaryWorkspaceId, "default");
@@ -356,7 +368,7 @@ test("records service probe warnings without changing path discovery", async (t)
 
 function findSkillRoot(
   model: Awaited<ReturnType<typeof discoverOpenClawWorkspaceModel>>,
-  targetPath: string
+  targetPath: string,
 ) {
   return model.skillRoots.find((root) => root.path === targetPath);
 }
@@ -367,7 +379,7 @@ function createStatusCommand(payload: Record<string, unknown>): RunCommand {
     args: [...args],
     exitCode: 0,
     stdout: JSON.stringify(payload),
-    stderr: ""
+    stderr: "",
   });
 }
 

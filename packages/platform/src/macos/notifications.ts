@@ -7,18 +7,16 @@ export class MacosNotificationClient implements NotificationClient {
   async send(request: NotificationRequest): Promise<NotificationReceipt> {
     const script = buildDisplayNotificationScript(request);
     await this.commandRunner.run("osascript", ["-e", script], {
-      rejectOnNonZero: true
+      rejectOnNonZero: true,
     });
 
     return {
-      deliveredAt: new Date().toISOString()
+      deliveredAt: new Date().toISOString(),
     };
   }
 }
 
-export function buildDisplayNotificationScript(
-  request: NotificationRequest
-): string {
+export function buildDisplayNotificationScript(request: NotificationRequest): string {
   const body = toAppleScriptString(normalizeNotificationValue(request.body));
   const title = toAppleScriptString(normalizeNotificationValue(request.title));
   const subtitleClause =

@@ -5,15 +5,14 @@ import { resolveStoragePaths } from "@clawguard/storage";
 export async function startDaemon(): Promise<string> {
   const platformAdapter = createPlatformAdapter();
   const storagePaths = resolveStoragePaths();
-  const preferredRuntime = await platformAdapter.containerRuntimes.getPreferredRuntime(
-    defaultDetonationRuntime
-  );
+  const preferredRuntime =
+    await platformAdapter.containerRuntimes.getPreferredRuntime(defaultDetonationRuntime);
 
   return [
     "clawguard daemon scaffold",
     `platform=${platformAdapter.capabilities.platform}`,
     `runtime=${preferredRuntime?.runtime ?? `${defaultDetonationRuntime} (unavailable)`}`,
-    `state=${storagePaths.stateDbPath}`
+    `state=${storagePaths.stateDbPath}`,
   ].join(" | ");
 }
 

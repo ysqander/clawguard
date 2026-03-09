@@ -4,7 +4,7 @@ import type {
   DecisionRecord,
   ReportSummary,
   ScanRecord,
-  StaticScanReport
+  StaticScanReport,
 } from "@clawguard/contracts";
 
 export type QuarantineState = "active" | "restored" | "deleted";
@@ -108,8 +108,10 @@ export interface StorageApi {
   upsertDecision(input: UpsertDecisionInput): Promise<DecisionRecord>;
   getDecision(contentHash: string): Promise<DecisionRecord | undefined>;
   createQuarantineRecord(input: CreateQuarantineRecordInput): Promise<QuarantineRecord>;
-  setQuarantineState(quarantineId: string, state: QuarantineState): Promise<QuarantineRecord | undefined>;
+  setQuarantineState(
+    quarantineId: string,
+    state: QuarantineState,
+  ): Promise<QuarantineRecord | undefined>;
   listQuarantineRecords(options?: ListQuarantineRecordsOptions): Promise<QuarantineRecord[]>;
   close(): void;
 }
-

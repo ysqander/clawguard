@@ -5,7 +5,7 @@ export {
   createMacosStoragePaths,
   defaultMacosStoragePaths,
   expandHomePath,
-  resolveStoragePaths
+  resolveStoragePaths,
 } from "./paths.js";
 
 export type {
@@ -21,5 +21,5 @@ export type {
   StoredStaticReport,
   UpsertDecisionInput,
   WriteArtifactInput,
-  WriteJsonArtifactInput
+  WriteJsonArtifactInput,
 } from "./types.js";

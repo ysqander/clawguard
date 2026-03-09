@@ -7,7 +7,7 @@ import type { CommandRunner } from "../shared/command-runner.js";
 export class MacosServiceManager implements ServiceManager {
   constructor(
     private readonly commandRunner: CommandRunner,
-    private readonly options: { homeDir: string; userId: number }
+    private readonly options: { homeDir: string; userId: number },
   ) {}
 
   async installService(definition: ServiceDefinition): Promise<ServiceStatus> {
@@ -20,12 +20,12 @@ export class MacosServiceManager implements ServiceManager {
     await this.commandRunner.run(
       "launchctl",
       ["bootout", getLaunchctlLabel(this.options.userId, definition.label)],
-      { rejectOnNonZero: false }
+      { rejectOnNonZero: false },
     );
     await this.commandRunner.run(
       "launchctl",
       ["bootstrap", getLaunchctlDomain(this.options.userId), plistPath],
-      { rejectOnNonZero: true }
+      { rejectOnNonZero: true },
     );
 
     return this.getServiceStatus(definition.label);
@@ -37,7 +37,7 @@ export class MacosServiceManager implements ServiceManager {
     await this.commandRunner.run(
       "launchctl",
       ["bootout", getLaunchctlLabel(this.options.userId, label)],
-      { rejectOnNonZero: false }
+      { rejectOnNonZero: false },
     );
     await rm(plistPath, { force: true });
   }
@@ -52,14 +52,14 @@ export class MacosServiceManager implements ServiceManager {
         plistPath,
         installed: false,
         loaded: false,
-        running: false
+        running: false,
       };
     }
 
     const result = await this.commandRunner.run(
       "launchctl",
       ["print", getLaunchctlLabel(this.options.userId, label)],
-      { rejectOnNonZero: false }
+      { rejectOnNonZero: false },
     );
 
     if (result.exitCode !== 0) {
@@ -68,7 +68,7 @@ export class MacosServiceManager implements ServiceManager {
         plistPath,
         installed: true,
         loaded: false,
-        running: false
+        running: false,
       };
     }
 
@@ -87,16 +87,16 @@ export function renderLaunchAgentPlist(definition: ServiceDefinition): string {
           "  <dict>",
           ...Object.entries(definition.environment).map(
             ([key, value]) =>
-              `    <key>${escapeXml(key)}</key>\n    <string>${escapeXml(value)}</string>`
+              `    <key>${escapeXml(key)}</key>\n    <string>${escapeXml(value)}</string>`,
           ),
-          "  </dict>"
+          "  </dict>",
         ].join("\n")
       : undefined;
 
   return [
-    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-    "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">",
-    "<plist version=\"1.0\">",
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
     "<dict>",
     `  <key>Label</key>\n  <string>${escapeXml(definition.label)}</string>`,
     "  <key>ProgramArguments</key>",
@@ -108,35 +108,27 @@ export function renderLaunchAgentPlist(definition: ServiceDefinition): string {
     ...(definition.workingDirectory !== undefined
       ? [
           `  <key>WorkingDirectory</key>\n  <string>${escapeXml(
-            definition.workingDirectory
-          )}</string>`
+            definition.workingDirectory,
+          )}</string>`,
         ]
       : []),
     ...(definition.stdoutPath !== undefined
-      ? [
-          `  <key>StandardOutPath</key>\n  <string>${escapeXml(
-            definition.stdoutPath
-          )}</string>`
-        ]
+      ? [`  <key>StandardOutPath</key>\n  <string>${escapeXml(definition.stdoutPath)}</string>`]
       : []),
     ...(definition.stderrPath !== undefined
-      ? [
-          `  <key>StandardErrorPath</key>\n  <string>${escapeXml(
-            definition.stderrPath
-          )}</string>`
-        ]
+      ? [`  <key>StandardErrorPath</key>\n  <string>${escapeXml(definition.stderrPath)}</string>`]
       : []),
     ...(environmentVariables !== undefined ? [environmentVariables] : []),
     "</dict>",
     "</plist>",
-    ""
+    "",
   ].join("\n");
 }
 
 export function parseLaunchctlPrintOutput(
   label: string,
   plistPath: string,
-  output: string
+  output: string,
 ): ServiceStatus {
   const pid = parseIntegerMatch(output, /\bpid = (\d+)/u);
   const lastExitCode = parseIntegerMatch(output, /\blast exit code = (\d+)/u);
@@ -149,7 +141,7 @@ export function parseLaunchctlPrintOutput(
     loaded: true,
     running,
     ...(pid !== undefined ? { pid } : {}),
-    ...(lastExitCode !== undefined ? { lastExitCode } : {})
+    ...(lastExitCode !== undefined ? { lastExitCode } : {}),
   };
 }
 

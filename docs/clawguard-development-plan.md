@@ -2,6 +2,15 @@
 
 This plan translates the product spec in `docs/clawguard-spec-v2.docx` into a delivery structure that supports parallel development in a monorepo from day one. The core scope remains unchanged: ClawGuard decides whether a skill should be present on the machine, not whether a runtime tool call should execute.
 
+## Current status snapshot
+
+As of 2026-03-09, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, and the OpenClaw workspace discovery model.
+
+The main post-foundation work now starts with:
+
+- watcher scheduling, quarantine flows, and skill snapshot production on top of the discovery model
+- static scanner, threat-intelligence, reporting, and daemon orchestration work needed for the rest of Milestone A
+
 ## Confirmed architecture decisions
 
 - Monorepo from day one.
@@ -127,6 +136,7 @@ Before multiple developers fan out, define these contracts in `packages/contract
 - `DecisionRecord`: quarantine state, allow or block action, hash status, timestamps
 - `ArtifactRef`: artifact type, on-disk path, MIME type, owning scan ID
 - `PlatformCapabilities`: watcher, notifications, service install, runtime availability
+- `OpenClawWorkspaceModel`: config path, primary workspace, deduplicated skill roots, service signals, warnings
 - `DaemonEvent`: scan requested, scan completed, detonation completed, quarantine changed, notification sent
 
 Once these contracts are stable, the streams below can move in parallel with low coordination cost.
@@ -140,6 +150,10 @@ Scope:
 - Initialize the monorepo, package tooling, linting, testing, builds, and release flow.
 - Define the shared contracts, configuration model, logging conventions, and error taxonomy.
 - Establish app and package boundaries so downstream work does not collapse into one package.
+
+Current status:
+
+- Monorepo package boundaries, builds, typechecks, tests, lint/format tooling, CI, and ADRs are in place.
 
 Outputs:
 
@@ -173,14 +187,15 @@ Dependencies:
 
 Scope:
 
-- Detect OpenClaw workspace and skill directories from config, lock files, known defaults, and service presence.
-- Implement macOS watcher integration with debouncing and idempotent scan scheduling.
+- Detect OpenClaw workspaces and skill roots from JSON5 config, lock files, managed defaults, extra directories, and known fallback locations.
+- Record OpenClaw service install/running state as an auxiliary signal without affecting path precedence.
+- Implement macOS watcher integration with debouncing and idempotent scan scheduling across all discovered skill roots.
 - Create quarantine, allow, and block flows using content hashes and non-destructive rename semantics.
 
 Outputs:
 
-- Discovery module with ordered fallback logic from the spec.
-- Watcher pipeline that emits `SkillSnapshot` work.
+- Discovery module that returns the normalized `OpenClawWorkspaceModel`.
+- Watcher pipeline that emits `SkillSnapshot` work from all discovered skill roots.
 - Quarantine lifecycle backed by SQLite state and artifact references.
 
 Dependencies:

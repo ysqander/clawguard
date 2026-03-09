@@ -9,7 +9,7 @@ import {
   type DiscoveredWorkspace,
   type DiscoveryConfig,
   type OpenClawWorkspaceModel,
-  type WorkspaceDiscoverySourceKind
+  type WorkspaceDiscoverySourceKind,
 } from "@clawguard/contracts";
 
 import { loadOpenClawConfig } from "./config-loader.js";
@@ -25,28 +25,28 @@ export interface DiscoverOpenClawWorkspaceModelOptions {
 }
 
 export async function discoverOpenClawWorkspaceModel(
-  options: DiscoverOpenClawWorkspaceModelOptions = {}
+  options: DiscoverOpenClawWorkspaceModelOptions = {},
 ): Promise<OpenClawWorkspaceModel> {
   const homeDir = options.homeDir ?? homedir();
   const cwd = options.cwd ?? process.cwd();
   const discoveryConfig = resolveDiscoveryConfig(options.config);
   const configPath = resolveDiscoveryPath(discoveryConfig.openClawConfigPath, {
     homeDir,
-    baseDir: cwd
+    baseDir: cwd,
   });
   const managedSkillsPath = resolveDiscoveryPath(discoveryConfig.managedSkillsPath, {
     homeDir,
-    baseDir: cwd
+    baseDir: cwd,
   });
   const fallbackSkillDirs = discoveryConfig.fallbackSkillDirs.map((skillDir) =>
-    resolveDiscoveryPath(skillDir, { homeDir, baseDir: cwd })
+    resolveDiscoveryPath(skillDir, { homeDir, baseDir: cwd }),
   );
   const warnings: string[] = [];
   const workspaces: DiscoveredWorkspace[] = [];
   const skillRoots = new Map<string, DiscoveredSkillRoot>();
   let preferredFallbackWorkspaceId: string | undefined;
 
-  let configResult;
+  let configResult: Awaited<ReturnType<typeof loadOpenClawConfig>>;
   try {
     configResult = await loadOpenClawConfig(configPath, { homeDir });
   } catch (error) {
@@ -63,7 +63,7 @@ export async function discoverOpenClawWorkspaceModel(
         exists: await pathExists(workspace.workspacePath),
         precedence: WORKSPACE_PRECEDENCE.config,
         ...(workspace.agentName !== undefined ? { agentName: workspace.agentName } : {}),
-        ...(workspace.isPrimary !== undefined ? { isPrimary: workspace.isPrimary } : {})
+        ...(workspace.isPrimary !== undefined ? { isPrimary: workspace.isPrimary } : {}),
       });
       await mergeSkillRoot(skillRoots, {
         path: workspace.skillsPath,
@@ -71,7 +71,7 @@ export async function discoverOpenClawWorkspaceModel(
         source: "config",
         exists: await pathExists(workspace.skillsPath),
         precedence: ROOT_PRECEDENCE.workspace,
-        workspaceId: workspace.id
+        workspaceId: workspace.id,
       });
     }
 
@@ -81,7 +81,7 @@ export async function discoverOpenClawWorkspaceModel(
         kind: "extra",
         source: "config",
         exists: await pathExists(extraDirPath),
-        precedence: ROOT_PRECEDENCE.extra
+        precedence: ROOT_PRECEDENCE.extra,
       });
     }
   }
@@ -93,14 +93,14 @@ export async function discoverOpenClawWorkspaceModel(
       kind: "managed",
       source: "default",
       exists: managedExists,
-      precedence: ROOT_PRECEDENCE.managed
+      precedence: ROOT_PRECEDENCE.managed,
     });
   }
 
   if (workspaces.length === 0) {
     const lockfileResult = await resolveLockfileWorkspace({
       cwd,
-      fallbackSkillDirs
+      fallbackSkillDirs,
     });
     warnings.push(...lockfileResult.warnings);
 
@@ -112,7 +112,7 @@ export async function discoverOpenClawWorkspaceModel(
         source: "lockfile",
         exists: await pathExists(lockfileResult.workspace.workspacePath),
         precedence: WORKSPACE_PRECEDENCE.lockfile,
-        isPrimary: true
+        isPrimary: true,
       });
       await mergeSkillRoot(skillRoots, {
         path: lockfileResult.workspace.skillsPath,
@@ -120,7 +120,7 @@ export async function discoverOpenClawWorkspaceModel(
         source: "lockfile",
         exists: await pathExists(lockfileResult.workspace.skillsPath),
         precedence: ROOT_PRECEDENCE.workspace,
-        workspaceId: "lockfile:0"
+        workspaceId: "lockfile:0",
       });
     }
   }
@@ -133,8 +133,8 @@ export async function discoverOpenClawWorkspaceModel(
         skillsPath,
         source: "default" as const,
         exists: await pathExists(path.dirname(skillsPath)),
-        precedence: WORKSPACE_PRECEDENCE.default
-      }))
+        precedence: WORKSPACE_PRECEDENCE.default,
+      })),
     );
 
     for (const workspace of fallbackWorkspaces) {
@@ -145,7 +145,7 @@ export async function discoverOpenClawWorkspaceModel(
         source: "default",
         exists: await pathExists(workspace.skillsPath),
         precedence: ROOT_PRECEDENCE.fallback,
-        workspaceId: workspace.id
+        workspaceId: workspace.id,
       });
     }
 
@@ -162,13 +162,13 @@ export async function discoverOpenClawWorkspaceModel(
     workspaces[0]?.id;
   const normalizedWorkspaces = workspaces.map((workspace) => ({
     ...workspace,
-    ...(workspace.id === primaryWorkspaceId ? { isPrimary: true } : {})
+    ...(workspace.id === primaryWorkspaceId ? { isPrimary: true } : {}),
   }));
 
   const serviceSignals: OpenClawWorkspaceModel["serviceSignals"] = [];
   const serviceProbe = await probeGatewayService({
     ...(options.now !== undefined ? { now: options.now } : {}),
-    ...(options.runCommand !== undefined ? { runCommand: options.runCommand } : {})
+    ...(options.runCommand !== undefined ? { runCommand: options.runCommand } : {}),
   });
   if (serviceProbe.signal !== undefined) {
     serviceSignals.push(serviceProbe.signal);
@@ -183,19 +183,21 @@ export async function discoverOpenClawWorkspaceModel(
     workspaces: normalizedWorkspaces.sort(compareWorkspaces),
     skillRoots: [...skillRoots.values()].sort(compareSkillRoots),
     serviceSignals,
-    warnings
+    warnings,
   };
 }
 
 export function describeOpenClawWorkspaceModel(model: OpenClawWorkspaceModel): string {
   const workspaceCount = model.workspaces.length;
   const skillRootCount = model.skillRoots.length;
-  const primaryWorkspace = model.workspaces.find((workspace) => workspace.id === model.primaryWorkspaceId);
+  const primaryWorkspace = model.workspaces.find(
+    (workspace) => workspace.id === model.primaryWorkspaceId,
+  );
 
   return [
     `OpenClaw discovery: ${workspaceCount} workspace${workspaceCount === 1 ? "" : "s"}`,
     `${skillRootCount} skill root${skillRootCount === 1 ? "" : "s"}`,
-    primaryWorkspace !== undefined ? `primary=${primaryWorkspace.workspacePath}` : "primary=none"
+    primaryWorkspace !== undefined ? `primary=${primaryWorkspace.workspacePath}` : "primary=none",
   ].join(" | ");
 }
 
@@ -212,8 +214,8 @@ async function resolveLockfileWorkspace(options: {
   const candidatePaths = dedupePaths([
     path.join(options.cwd, ".clawhub", "lock.json"),
     ...options.fallbackSkillDirs.map((skillDir) =>
-      path.join(path.dirname(skillDir), ".clawhub", "lock.json")
-    )
+      path.join(path.dirname(skillDir), ".clawhub", "lock.json"),
+    ),
   ]);
   const warnings: string[] = [];
 
@@ -233,9 +235,9 @@ async function resolveLockfileWorkspace(options: {
       return {
         workspace: {
           workspacePath,
-          skillsPath: path.join(workspacePath, "skills")
+          skillsPath: path.join(workspacePath, "skills"),
         },
-        warnings
+        warnings,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -248,7 +250,7 @@ async function resolveLockfileWorkspace(options: {
 
 async function mergeSkillRoot(
   skillRoots: Map<string, DiscoveredSkillRoot>,
-  candidate: DiscoveredSkillRoot
+  candidate: DiscoveredSkillRoot,
 ): Promise<void> {
   const existing = skillRoots.get(candidate.path);
   if (existing === undefined) {
@@ -274,14 +276,16 @@ async function mergeSkillRoot(
     source: preferredSource,
     exists: existing.exists || candidate.exists,
     precedence: Math.max(existing.precedence, candidate.precedence),
-    ...(mergedWorkspaceId !== undefined ? { workspaceId: mergedWorkspaceId } : {})
+    ...(mergedWorkspaceId !== undefined ? { workspaceId: mergedWorkspaceId } : {}),
   });
 }
 
-function resolveDiscoveryConfig(configOverrides: Partial<DiscoveryConfig> | undefined): DiscoveryConfig {
+function resolveDiscoveryConfig(
+  configOverrides: Partial<DiscoveryConfig> | undefined,
+): DiscoveryConfig {
   return {
     ...defaultClawGuardConfig.discovery,
-    ...configOverrides
+    ...configOverrides,
   };
 }
 
@@ -323,14 +327,14 @@ function dedupePaths(candidatePaths: string[]): string[] {
 const WORKSPACE_PRECEDENCE = {
   config: 300,
   lockfile: 200,
-  default: 100
+  default: 100,
 } as const;
 
 const ROOT_PRECEDENCE: Record<DiscoveredSkillRootKind, number> = {
   workspace: 300,
   managed: 200,
   extra: 100,
-  fallback: 50
+  fallback: 50,
 };
 
 export type { RunCommand } from "./service-probe.js";

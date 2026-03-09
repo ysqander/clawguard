@@ -59,7 +59,7 @@ export function parseInteger(input: unknown, path: Path): number {
 export function parseOptional<T>(
   input: unknown,
   parser: (value: unknown, path: Path) => T,
-  path: Path
+  path: Path,
 ): T | undefined {
   if (input === undefined) {
     return undefined;
@@ -79,7 +79,7 @@ export function parseStringArray(input: unknown, path: Path): string[] {
 export function parseArray<T>(
   input: unknown,
   parser: (value: unknown, path: Path) => T,
-  path: Path
+  path: Path,
 ): T[] {
   if (!Array.isArray(input)) {
     issue(path, "Expected an array");
@@ -91,7 +91,7 @@ export function parseArray<T>(
 export function parseEnum<const T extends readonly string[]>(
   input: unknown,
   allowed: T,
-  path: Path
+  path: Path,
 ): T[number] {
   const value = parseNonEmptyString(input, path);
   if (!allowed.includes(value)) {
@@ -104,7 +104,7 @@ export function parseEnum<const T extends readonly string[]>(
 export function parseLiteral<const T extends string | number | boolean>(
   input: unknown,
   expected: T,
-  path: Path
+  path: Path,
 ): T {
   if (input !== expected) {
     issue(path, `Expected literal ${String(expected)}`);
@@ -129,17 +129,13 @@ export function parseRecord(input: unknown, path: Path): Record<string, unknown>
 export function parseObject<T>(
   input: unknown,
   path: Path,
-  reader: (record: Record<string, unknown>) => T
+  reader: (record: Record<string, unknown>) => T,
 ): T {
   const record = asRecord(input, path);
   return reader(record);
 }
 
-export function collectOptionalIssues<T>(
-  factory: () => T,
-  fallbackMessage: string,
-  path: Path
-): T {
+export function collectOptionalIssues<T>(factory: () => T, fallbackMessage: string, path: Path): T {
   try {
     return factory();
   } catch (error) {
@@ -153,7 +149,7 @@ export function collectOptionalIssues<T>(
 
 export function createValidator<T>(
   parser: (input: unknown, path: Path) => T,
-  rootName: string
+  rootName: string,
 ): {
   parse: (input: unknown) => T;
   is: (input: unknown) => input is T;
@@ -173,7 +169,7 @@ export function createValidator<T>(
 
         throw error;
       }
-    }
+    },
   };
 }
 

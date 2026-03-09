@@ -8,6 +8,16 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 - `P1`: required for Behavioral MVP
 - `P2`: launch hardening or post-MVP improvement
 
+## Current snapshot
+
+As of 2026-03-09, the repo has landed the main code and documentation for `CG-001` through `CG-005`.
+
+The next unfinished Milestone A tickets now start with:
+
+- `CG-006`: watcher scheduling across the discovered skill roots
+- `CG-007`: quarantine, allow, and block lifecycle
+- `CG-008`: `SkillSnapshot` production on top of the normalized discovery model
+
 ## Epic A: Monorepo Foundation
 
 ### CG-001 Initialize the monorepo and CI
@@ -15,6 +25,7 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 Priority: `P0`
 Milestone: `A`
 Depends on: none
+Status: `Complete`
 
 Scope:
 
@@ -26,13 +37,15 @@ Acceptance criteria:
 
 - The repo builds from a clean checkout.
 - `apps/daemon` and `apps/cli` can import shared packages.
-- CI runs on every push with green placeholder checks.
+- CI runs on every push with green install, build, typecheck, and test checks.
+- Lint and format commands are wired into the workspace and documented.
 
 ### CG-002 Define shared contracts and configuration schema
 
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-001`
+Status: `Complete`
 
 Scope:
 
@@ -45,12 +58,14 @@ Acceptance criteria:
 - All downstream packages can compile against `packages/contracts`.
 - Invalid config and malformed IPC payloads fail fast.
 - Example fixtures exist for the main contracts.
+- ADRs exist for contracts, IPC versioning, storage strategy, and runtime-provider strategy.
 
 ### CG-003 Implement storage architecture
 
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-001`, `CG-002`
+Status: `Complete`
 
 Scope:
 
@@ -69,6 +84,7 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-002`
+Status: `Complete`
 
 Scope:
 
@@ -89,18 +105,21 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-002`, `CG-004`
+Status: `Complete`
 
 Scope:
 
-- Parse `~/.openclaw/openclaw.json`.
-- Fall back to `.clawhub/lock.json`, known defaults, and service checks.
-- Normalize discovered paths into a single workspace model.
+- Parse `~/.openclaw/openclaw.json` as JSON5, including supported include chains, multi-agent workspaces, and extra skill directories.
+- Discover workspace, managed, extra, lockfile, and fallback skill roots with stable precedence and deduplication.
+- Probe the OpenClaw service separately to capture install/running signals and warnings without changing discovered paths.
+- Normalize the result into an `OpenClawWorkspaceModel`.
 
 Acceptance criteria:
 
-- Discovery follows the priority order from the spec.
-- Missing config files degrade cleanly.
-- Tests cover the known discovery permutations.
+- Discovery preserves the spec priority order for path sources.
+- Missing config files and malformed lockfiles degrade cleanly.
+- Service probe failures surface as warnings and do not break path discovery.
+- Tests cover include handling, multi-agent configs, root deduplication, service-probe warnings, and fallback permutations.
 
 ### CG-006 Implement watcher pipeline and scan scheduling
 
@@ -110,14 +129,15 @@ Depends on: `CG-003`, `CG-004`, `CG-005`
 
 Scope:
 
-- Watch skill directories on macOS.
+- Watch all discovered skill roots on macOS, not a single canonical skills directory.
 - Debounce and coalesce file events into one scan request per skill change.
-- Emit idempotent work items for the daemon.
+- Preserve discovery metadata when emitting idempotent work items for the daemon.
 
 Acceptance criteria:
 
 - Repeated file writes do not create duplicate scans.
-- New and modified skills are detected reliably.
+- New and modified skills are detected reliably across workspace, managed, extra, and fallback roots.
+- Missing or temporarily absent roots do not crash watcher startup or recovery.
 - The watcher can recover after transient filesystem errors.
 
 ### CG-007 Implement quarantine, allow, and block lifecycle
@@ -148,14 +168,14 @@ Depends on: `CG-002`, `CG-005`
 
 Scope:
 
-- Walk skill directories, hash contents, and inventory files.
+- Walk skills discovered from the normalized discovery model, hash contents, and inventory files.
 - Parse `SKILL.md` and any available manifest data.
-- Emit normalized `SkillSnapshot` objects for scanning.
+- Emit normalized `SkillSnapshot` objects for scanning, including discovery-derived source hints.
 
 Acceptance criteria:
 
 - The same skill contents always produce the same content hash.
-- Snapshot output includes file inventory and parsed metadata.
+- Snapshot output includes file inventory, parsed metadata, and discovery source context.
 - Corrupt or partial skills return structured errors, not crashes.
 
 ### CG-009 Implement static rule engine and scoring

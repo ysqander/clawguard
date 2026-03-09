@@ -29,7 +29,7 @@ export async function loadOpenClawConfig(
   options: {
     homeDir: string;
     readTextFile?: (filePath: string) => Promise<string>;
-  }
+  },
 ): Promise<LoadedOpenClawConfig | undefined> {
   const readTextFile = options.readTextFile ?? defaultReadTextFile;
   if (!(await pathExists(configPath))) {
@@ -41,7 +41,7 @@ export async function loadOpenClawConfig(
     currentFilePath: configPath,
     depth: 0,
     stack: [configPath],
-    readTextFile
+    readTextFile,
   });
 
   if (!isJsonObject(resolvedConfig)) {
@@ -51,36 +51,28 @@ export async function loadOpenClawConfig(
   return {
     workspaces: extractConfiguredWorkspaces(resolvedConfig, {
       configDirectoryPath: path.dirname(configPath),
-      homeDir: options.homeDir
+      homeDir: options.homeDir,
     }),
     extraDirs: extractExtraDirs(resolvedConfig, {
       configDirectoryPath: path.dirname(configPath),
-      homeDir: options.homeDir
-    })
+      homeDir: options.homeDir,
+    }),
   };
 }
 
-async function resolveConfigFile(
-  filePath: string,
-  state: ResolveState
-): Promise<JsonValue> {
+async function resolveConfigFile(filePath: string, state: ResolveState): Promise<JsonValue> {
   const rawText = await state.readTextFile(filePath);
   const parsed = parseJson5Object(rawText, filePath);
 
   return resolveJsonValue(parsed, {
     ...state,
-    currentFilePath: filePath
+    currentFilePath: filePath,
   });
 }
 
-async function resolveJsonValue(
-  input: JsonValue,
-  state: ResolveState
-): Promise<JsonValue> {
+async function resolveJsonValue(input: JsonValue, state: ResolveState): Promise<JsonValue> {
   if (Array.isArray(input)) {
-    const resolvedItems = await Promise.all(
-      input.map((item) => resolveJsonValue(item, state))
-    );
+    const resolvedItems = await Promise.all(input.map((item) => resolveJsonValue(item, state)));
     return resolvedItems;
   }
 
@@ -96,7 +88,9 @@ async function resolveJsonValue(
 
   const siblingEntries = Object.entries(input).filter(([key]) => key !== "$include");
   const resolvedSiblingEntries = await Promise.all(
-    siblingEntries.map(async ([key, value]) => [key, await resolveJsonValue(value, state)] as const)
+    siblingEntries.map(
+      async ([key, value]) => [key, await resolveJsonValue(value, state)] as const,
+    ),
   );
 
   return deepMergeRecords(baseRecord, Object.fromEntries(resolvedSiblingEntries));
@@ -104,7 +98,7 @@ async function resolveJsonValue(
 
 async function resolveIncludeSpec(
   includeSpec: JsonValue,
-  state: ResolveState
+  state: ResolveState,
 ): Promise<JsonObject> {
   if (typeof includeSpec === "string") {
     return loadIncludedRecord(includeSpec, state);
@@ -115,9 +109,7 @@ async function resolveIncludeSpec(
 
     for (const entry of includeSpec) {
       if (typeof entry !== "string") {
-        throw new Error(
-          `Expected ${state.currentFilePath}#$include entries to be strings`
-        );
+        throw new Error(`Expected ${state.currentFilePath}#$include entries to be strings`);
       }
 
       mergedRecord = deepMergeRecords(mergedRecord, await loadIncludedRecord(entry, state));
@@ -129,10 +121,7 @@ async function resolveIncludeSpec(
   throw new Error(`Expected ${state.currentFilePath}#$include to be a string or string[]`);
 }
 
-async function loadIncludedRecord(
-  includePath: string,
-  state: ResolveState
-): Promise<JsonObject> {
+async function loadIncludedRecord(includePath: string, state: ResolveState): Promise<JsonObject> {
   const nextDepth = state.depth + 1;
   if (nextDepth > 10) {
     throw new Error(`Config includes exceeded the maximum nesting depth at ${includePath}`);
@@ -154,7 +143,7 @@ async function loadIncludedRecord(
     ...state,
     currentFilePath: resolvedIncludePath,
     depth: nextDepth,
-    stack: [...state.stack, resolvedIncludePath]
+    stack: [...state.stack, resolvedIncludePath],
   });
 
   if (!isJsonObject(resolvedValue)) {
@@ -166,27 +155,27 @@ async function loadIncludedRecord(
 
 function extractConfiguredWorkspaces(
   configRecord: JsonObject,
-  options: { configDirectoryPath: string; homeDir: string }
+  options: { configDirectoryPath: string; homeDir: string },
 ): LoadedConfigWorkspace[] {
   const agentsRecord = expectOptionalObject(configRecord.agents, "agents");
   const defaultsRecord = expectOptionalObject(agentsRecord?.defaults, "agents.defaults");
   const defaultWorkspaceRaw = expectOptionalString(
     defaultsRecord?.workspace,
-    "agents.defaults.workspace"
+    "agents.defaults.workspace",
   );
 
   const workspaces: LoadedConfigWorkspace[] = [];
   if (defaultWorkspaceRaw !== undefined) {
     const workspacePath = resolveDiscoveryPath(defaultWorkspaceRaw, {
       homeDir: options.homeDir,
-      baseDir: options.configDirectoryPath
+      baseDir: options.configDirectoryPath,
     });
     workspaces.push({
       id: "default",
       workspacePath,
       skillsPath: path.join(workspacePath, "skills"),
       agentName: "default",
-      isPrimary: true
+      isPrimary: true,
     });
   }
 
@@ -207,7 +196,7 @@ function extractConfiguredWorkspaces(
 
     const workspacePath = resolveDiscoveryPath(agentWorkspaceRaw, {
       homeDir: options.homeDir,
-      baseDir: options.configDirectoryPath
+      baseDir: options.configDirectoryPath,
     });
     const agentName =
       expectOptionalString(agentRecord.name, `agents.list[${index}].name`) ??
@@ -217,7 +206,7 @@ function extractConfiguredWorkspaces(
       id: agentName !== undefined ? `agent:${agentName}` : `agent:${index}`,
       workspacePath,
       skillsPath: path.join(workspacePath, "skills"),
-      ...(agentName !== undefined ? { agentName } : {})
+      ...(agentName !== undefined ? { agentName } : {}),
     });
   }
 
@@ -226,7 +215,7 @@ function extractConfiguredWorkspaces(
 
 function extractExtraDirs(
   configRecord: JsonObject,
-  options: { configDirectoryPath: string; homeDir: string }
+  options: { configDirectoryPath: string; homeDir: string },
 ): string[] {
   const skillsRecord = expectOptionalObject(configRecord.skills, "skills");
   const loadRecord = expectOptionalObject(skillsRecord?.load, "skills.load");
@@ -237,13 +226,10 @@ function extractExtraDirs(
 
   const extraDirItems = expectArray(extraDirsRaw, "skills.load.extraDirs");
   return extraDirItems.map((item, index) =>
-    resolveDiscoveryPath(
-      expectString(item, `skills.load.extraDirs[${index}]`),
-      {
-        homeDir: options.homeDir,
-        baseDir: options.configDirectoryPath
-      }
-    )
+    resolveDiscoveryPath(expectString(item, `skills.load.extraDirs[${index}]`), {
+      homeDir: options.homeDir,
+      baseDir: options.configDirectoryPath,
+    }),
   );
 }
 
@@ -282,7 +268,7 @@ function expectObject(input: JsonValue, pathDescription: string): JsonObject {
 
 function expectOptionalObject(
   input: JsonValue | undefined,
-  pathDescription: string
+  pathDescription: string,
 ): JsonObject | undefined {
   if (input === undefined) {
     return undefined;
@@ -301,7 +287,7 @@ function expectArray(input: JsonValue, pathDescription: string): JsonValue[] {
 
 function expectOptionalArray(
   input: JsonValue | undefined,
-  pathDescription: string
+  pathDescription: string,
 ): JsonValue[] | undefined {
   if (input === undefined) {
     return undefined;
@@ -320,7 +306,7 @@ function expectString(input: JsonValue, pathDescription: string): string {
 
 function expectOptionalString(
   input: JsonValue | undefined,
-  pathDescription: string
+  pathDescription: string,
 ): string | undefined {
   if (input === undefined) {
     return undefined;

@@ -3,17 +3,14 @@ import assert from "node:assert/strict";
 
 import { UnsupportedFeatureError, createPlatformAdapter } from "./index.js";
 import { buildDisplayNotificationScript } from "./macos/notifications.js";
-import {
-  parseLaunchctlPrintOutput,
-  renderLaunchAgentPlist
-} from "./macos/service-manager.js";
+import { parseLaunchctlPrintOutput, renderLaunchAgentPlist } from "./macos/service-manager.js";
 import { normalizeWatchEventType } from "./macos/watcher.js";
 
 test("createPlatformAdapter returns a macOS adapter for darwin", () => {
   const adapter = createPlatformAdapter({
     platform: "darwin",
     userId: 501,
-    homeDir: "/Users/tester"
+    homeDir: "/Users/tester",
   });
 
   assert.equal(adapter.capabilities.platform, "macos");
@@ -32,17 +29,17 @@ test("linux adapter exposes placeholders for unsupported features", async () => 
 
   await assert.rejects(
     adapter.notifications.send({ title: "ClawGuard", body: "Blocked" }),
-    UnsupportedFeatureError
+    UnsupportedFeatureError,
   );
   await assert.rejects(
     adapter.services.getServiceStatus("com.clawguard.daemon"),
-    UnsupportedFeatureError
+    UnsupportedFeatureError,
   );
   await assert.rejects(
     adapter.watcher.watchDirectory("/tmp", {
-      onEvent() {}
+      onEvent() {},
     }),
-    UnsupportedFeatureError
+    UnsupportedFeatureError,
   );
 });
 
@@ -57,13 +54,13 @@ test("container runtime detection prefers available runtimes", async () => {
             args: ["--version"],
             exitCode: 0,
             stdout: "podman version 5.6.0\n",
-            stderr: ""
+            stderr: "",
           };
         }
 
         throw new Error("not installed");
-      }
-    }
+      },
+    },
   });
 
   const available = await adapter.containerRuntimes.detectAvailableRuntimes();
@@ -73,13 +70,13 @@ test("container runtime detection prefers available runtimes", async () => {
     {
       runtime: "podman",
       command: "podman",
-      version: "podman version 5.6.0"
-    }
+      version: "podman version 5.6.0",
+    },
   ]);
   assert.deepEqual(preferred, {
     runtime: "podman",
     command: "podman",
-    version: "podman version 5.6.0"
+    version: "podman version 5.6.0",
   });
 });
 
@@ -90,11 +87,11 @@ test("macOS helpers render stable scripts and plist content", () => {
 
   assert.equal(
     buildDisplayNotificationScript({
-      title: "ClawGuard \"Alert\"",
+      title: 'ClawGuard "Alert"',
       body: "Skill quarantined",
-      subtitle: "review needed"
+      subtitle: "review needed",
     }),
-    "display notification \"Skill quarantined\" with title \"ClawGuard \\\"Alert\\\"\" subtitle \"review needed\""
+    'display notification "Skill quarantined" with title "ClawGuard \\"Alert\\"" subtitle "review needed"',
   );
 
   const plist = renderLaunchAgentPlist({
@@ -103,7 +100,7 @@ test("macOS helpers render stable scripts and plist content", () => {
     args: ["apps/daemon/dist/index.js"],
     workingDirectory: "/workspace",
     runAtLoad: true,
-    keepAlive: true
+    keepAlive: true,
   });
 
   assert.match(plist, /<key>Label<\/key>\s*<string>com\.clawguard\.daemon<\/string>/u);
@@ -119,8 +116,8 @@ test("macOS helpers render stable scripts and plist content", () => {
         "\tstate = running",
         "\tpid = 9901",
         "\tlast exit code = 0",
-        "}"
-      ].join("\n")
+        "}",
+      ].join("\n"),
     ),
     {
       label: "com.clawguard.daemon",
@@ -129,7 +126,7 @@ test("macOS helpers render stable scripts and plist content", () => {
       loaded: true,
       running: true,
       pid: 9901,
-      lastExitCode: 0
-    }
+      lastExitCode: 0,
+    },
   );
 });

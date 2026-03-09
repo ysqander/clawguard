@@ -17,4 +17,3 @@
     "clean": "tsc -b --clean"
   }
 }
-

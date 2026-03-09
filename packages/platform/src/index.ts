@@ -5,15 +5,17 @@ import { createLinuxPlatformAdapter } from "./linux/adapter.js";
 import { createMacosPlatformAdapter } from "./macos/adapter.js";
 import type { PlatformAdapter, PlatformFactoryOptions } from "./types.js";
 
-export { CommandExecutionError, UnsupportedFeatureError, UnsupportedPlatformError } from "./errors.js";
+export {
+  CommandExecutionError,
+  UnsupportedFeatureError,
+  UnsupportedPlatformError,
+} from "./errors.js";
 export { createLinuxPlatformAdapter } from "./linux/adapter.js";
 export { createMacosPlatformAdapter } from "./macos/adapter.js";
-export {
-  buildDisplayNotificationScript
-} from "./macos/notifications.js";
+export { buildDisplayNotificationScript } from "./macos/notifications.js";
 export {
   parseLaunchctlPrintOutput,
-  renderLaunchAgentPlist
+  renderLaunchAgentPlist,
 } from "./macos/service-manager.js";
 export { normalizeWatchEventType } from "./macos/watcher.js";
 export type {
@@ -31,12 +33,10 @@ export type {
   ServiceStatus,
   WatchHandlers,
   WatchOptions,
-  WatchSubscription
+  WatchSubscription,
 } from "./types.js";
 
-export function createPlatformAdapter(
-  options: PlatformFactoryOptions = {}
-): PlatformAdapter {
+export function createPlatformAdapter(options: PlatformFactoryOptions = {}): PlatformAdapter {
   switch (resolveSupportedPlatform(options.platform)) {
     case "macos":
       return createMacosPlatformAdapter(options);
@@ -46,7 +46,7 @@ export function createPlatformAdapter(
 }
 
 function resolveSupportedPlatform(
-  platform: PlatformFactoryOptions["platform"] = process.platform
+  platform: PlatformFactoryOptions["platform"] = process.platform,
 ): SupportedPlatform {
   switch (platform) {
     case "darwin":

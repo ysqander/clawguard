@@ -1,7 +1,4 @@
-import {
-  detonationRuntimeKinds,
-  type PlatformCapabilities
-} from "@clawguard/contracts";
+import { detonationRuntimeKinds, type PlatformCapabilities } from "@clawguard/contracts";
 
 import { UnsupportedFeatureError } from "../errors.js";
 import { createCommandRunner } from "../shared/command-runner.js";
@@ -15,7 +12,7 @@ import type {
   ServiceDefinition,
   ServiceManager,
   ServiceStatus,
-  WatchSubscription
+  WatchSubscription,
 } from "../types.js";
 
 const linuxCapabilities: PlatformCapabilities = {
@@ -23,11 +20,11 @@ const linuxCapabilities: PlatformCapabilities = {
   supportsWatcher: false,
   supportsNotifications: false,
   supportsServiceInstall: false,
-  supportedDetonationRuntimes: [...detonationRuntimeKinds]
+  supportedDetonationRuntimes: [...detonationRuntimeKinds],
 };
 
 export function createLinuxPlatformAdapter(
-  options: Pick<PlatformFactoryOptions, "commandRunner"> = {}
+  options: Pick<PlatformFactoryOptions, "commandRunner"> = {},
 ): PlatformAdapter {
   const commandRunner = options.commandRunner ?? createCommandRunner();
 
@@ -36,7 +33,7 @@ export function createLinuxPlatformAdapter(
     watcher: new LinuxPlaceholderWatcher(),
     notifications: new LinuxPlaceholderNotificationClient(),
     services: new LinuxPlaceholderServiceManager(),
-    containerRuntimes: createContainerRuntimeDetector({ commandRunner })
+    containerRuntimes: createContainerRuntimeDetector({ commandRunner }),
   };
 }
 

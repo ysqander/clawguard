@@ -7,4 +7,3 @@ export interface ClawHubClient {
 export interface VirusTotalClient {
   getFileVerdict(contentHash: string): Promise<ThreatIntelVerdict | null>;
 }
-

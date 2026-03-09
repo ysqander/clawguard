@@ -15,7 +15,7 @@ export function expandHomePath(inputPath: string, homeDir: string): string {
 
 export function resolveDiscoveryPath(
   inputPath: string,
-  options: { homeDir: string; baseDir: string }
+  options: { homeDir: string; baseDir: string },
 ): string {
   const expandedPath = expandHomePath(inputPath, options.homeDir);
   return path.isAbsolute(expandedPath)
@@ -36,4 +36,3 @@ export function isWithinDirectory(targetPath: string, directoryPath: string): bo
   const relativePath = path.relative(directoryPath, targetPath);
   return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
-

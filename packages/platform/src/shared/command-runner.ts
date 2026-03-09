@@ -28,7 +28,7 @@ export function createCommandRunner(): CommandRunner {
         const child = spawn(command, args, {
           cwd: options.cwd,
           env: options.env,
-          stdio: "pipe"
+          stdio: "pipe",
         });
 
         const stdoutChunks: Buffer[] = [];
@@ -50,7 +50,7 @@ export function createCommandRunner(): CommandRunner {
             args: [...args],
             exitCode,
             stdout: Buffer.concat(stdoutChunks).toString("utf8"),
-            stderr: Buffer.concat(stderrChunks).toString("utf8")
+            stderr: Buffer.concat(stderrChunks).toString("utf8"),
           });
         });
 
@@ -65,6 +65,6 @@ export function createCommandRunner(): CommandRunner {
       }
 
       return result;
-    }
+    },
   };
 }

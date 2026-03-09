@@ -31,7 +31,7 @@ export class CommandExecutionError extends Error {
     args: string[],
     exitCode: number | null,
     stderr: string,
-    options?: { cause?: unknown }
+    options?: { cause?: unknown },
   ) {
     super(`Command failed: ${command} ${args.join(" ")}`.trim(), options);
     this.name = "CommandExecutionError";

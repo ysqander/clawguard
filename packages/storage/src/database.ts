@@ -7,14 +7,14 @@ import {
   decisionRecordValidator,
   reportSummaryValidator,
   scanRecordValidator,
-  staticScanReportValidator
+  staticScanReportValidator,
 } from "@clawguard/contracts";
 import type {
   ArtifactRef,
   DecisionRecord,
   ReportSummary,
   ScanRecord,
-  StaticScanReport
+  StaticScanReport,
 } from "@clawguard/contracts";
 
 import { ArtifactStore } from "./artifact-store.js";
@@ -34,7 +34,7 @@ import type {
   StoredStaticReport,
   UpsertDecisionInput,
   WriteArtifactInput,
-  WriteJsonArtifactInput
+  WriteJsonArtifactInput,
 } from "./types.js";
 
 interface ScanRow {
@@ -111,7 +111,7 @@ function readDecisionRecord(row: DecisionRow): DecisionRecord {
     contentHash: row.content_hash,
     decision: row.decision,
     reason: row.reason,
-    createdAt: row.created_at
+    createdAt: row.created_at,
   });
 }
 
@@ -125,7 +125,7 @@ function readStoredArtifactRecord(row: ArtifactRow, artifactsRoot: string): Stor
     mimeType: row.mime_type,
     sha256: row.sha256,
     sizeBytes: row.size_bytes,
-    createdAt: row.created_at
+    createdAt: row.created_at,
   };
 }
 
@@ -139,20 +139,20 @@ function readQuarantineRecord(row: QuarantineRow): QuarantineRecord {
     state: row.state,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    ...(row.scan_id ? { scanId: row.scan_id } : {})
+    ...(row.scan_id ? { scanId: row.scan_id } : {}),
   };
 }
 
 function ensureReportConsistency(summary: ReportSummary, report: StaticScanReport): void {
   if (summary.reportId !== report.reportId) {
     throw new Error(
-      `Report summary/report mismatch: summary.reportId=${summary.reportId}, report.reportId=${report.reportId}`
+      `Report summary/report mismatch: summary.reportId=${summary.reportId}, report.reportId=${report.reportId}`,
     );
   }
 
   if (summary.slug !== report.snapshot.slug) {
     throw new Error(
-      `Report summary/report mismatch: summary.slug=${summary.slug}, report.snapshot.slug=${report.snapshot.slug}`
+      `Report summary/report mismatch: summary.slug=${summary.slug}, report.snapshot.slug=${report.snapshot.slug}`,
     );
   }
 }
@@ -176,7 +176,7 @@ export class ClawGuardStorage implements StorageApi {
     this.db.exec("PRAGMA journal_mode = WAL");
     this.db.exec("PRAGMA foreign_keys = ON");
     this.db.exec(
-      "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)"
+      "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)",
     );
 
     this.applyMigrations();
@@ -205,7 +205,7 @@ export class ClawGuardStorage implements StorageApi {
             started_at = excluded.started_at,
             completed_at = excluded.completed_at,
             scan_json = excluded.scan_json
-        `
+        `,
       )
       .run(
         scan.scanId,
@@ -214,7 +214,7 @@ export class ClawGuardStorage implements StorageApi {
         scan.status,
         scan.startedAt,
         scan.completedAt ?? null,
-        JSON.stringify(scan)
+        JSON.stringify(scan),
       );
 
     const storedScan = await this.getScan(scan.scanId);
@@ -239,7 +239,7 @@ export class ClawGuardStorage implements StorageApi {
             scan_json
           FROM scans
           WHERE scan_id = ?
-        `
+        `,
       )
       .get(scanId) as ScanRow | undefined;
 
@@ -293,7 +293,7 @@ export class ClawGuardStorage implements StorageApi {
             generated_at = excluded.generated_at,
             report_json = excluded.report_json,
             summary_json = excluded.summary_json
-        `
+        `,
       )
       .run(
         report.reportId,
@@ -305,7 +305,7 @@ export class ClawGuardStorage implements StorageApi {
         summary.findingCount,
         summary.generatedAt,
         JSON.stringify(report),
-        JSON.stringify(summary)
+        JSON.stringify(summary),
       );
 
     const storedReport = await this.getStaticReport(report.reportId);
@@ -333,7 +333,7 @@ export class ClawGuardStorage implements StorageApi {
             summary_json
           FROM reports
           WHERE report_id = ?
-        `
+        `,
       )
       .get(reportId) as ReportRow | undefined;
 
@@ -350,13 +350,15 @@ export class ClawGuardStorage implements StorageApi {
       summary,
       report,
       artifacts,
-      ...(decision ? { decision } : {})
+      ...(decision ? { decision } : {}),
     };
   }
 
   public async getLatestStaticReportBySlug(slug: string): Promise<StoredStaticReport | undefined> {
     const row = this.db
-      .prepare("SELECT report_id FROM reports WHERE skill_slug = ? ORDER BY generated_at DESC LIMIT 1")
+      .prepare(
+        "SELECT report_id FROM reports WHERE skill_slug = ? ORDER BY generated_at DESC LIMIT 1",
+      )
       .get(slug) as { report_id: string } | undefined;
 
     return row ? this.getStaticReport(row.report_id) : undefined;
@@ -378,7 +380,7 @@ export class ClawGuardStorage implements StorageApi {
       contentHash: input.contentHash,
       decision: input.decision,
       reason: input.reason,
-      createdAt
+      createdAt,
     });
 
     this.db
@@ -395,7 +397,7 @@ export class ClawGuardStorage implements StorageApi {
             decision = excluded.decision,
             reason = excluded.reason,
             created_at = excluded.created_at
-        `
+        `,
       )
       .run(decision.contentHash, decision.decision, decision.reason, decision.createdAt);
 
@@ -418,14 +420,16 @@ export class ClawGuardStorage implements StorageApi {
             created_at
           FROM decisions
           WHERE content_hash = ?
-        `
+        `,
       )
       .get(contentHash) as DecisionRow | undefined;
 
     return row ? readDecisionRecord(row) : undefined;
   }
 
-  public async createQuarantineRecord(input: CreateQuarantineRecordInput): Promise<QuarantineRecord> {
+  public async createQuarantineRecord(
+    input: CreateQuarantineRecordInput,
+  ): Promise<QuarantineRecord> {
     const quarantineId = input.quarantineId ?? randomUUID();
     const createdAt = input.createdAt ?? new Date().toISOString();
     const updatedAt = input.updatedAt ?? createdAt;
@@ -454,7 +458,7 @@ export class ClawGuardStorage implements StorageApi {
             quarantine_path = excluded.quarantine_path,
             state = excluded.state,
             updated_at = excluded.updated_at
-        `
+        `,
       )
       .run(
         quarantineId,
@@ -465,7 +469,7 @@ export class ClawGuardStorage implements StorageApi {
         input.quarantinePath,
         state,
         createdAt,
-        updatedAt
+        updatedAt,
       );
 
     const row = this.db
@@ -483,7 +487,7 @@ export class ClawGuardStorage implements StorageApi {
             updated_at
           FROM quarantine_entries
           WHERE quarantine_id = ?
-        `
+        `,
       )
       .get(quarantineId) as QuarantineRow | undefined;
 
@@ -496,7 +500,7 @@ export class ClawGuardStorage implements StorageApi {
 
   public async setQuarantineState(
     quarantineId: string,
-    state: QuarantineState
+    state: QuarantineState,
   ): Promise<QuarantineRecord | undefined> {
     this.db
       .prepare("UPDATE quarantine_entries SET state = ?, updated_at = ? WHERE quarantine_id = ?")
@@ -517,7 +521,7 @@ export class ClawGuardStorage implements StorageApi {
             updated_at
           FROM quarantine_entries
           WHERE quarantine_id = ?
-        `
+        `,
       )
       .get(quarantineId) as QuarantineRow | undefined;
 
@@ -525,7 +529,7 @@ export class ClawGuardStorage implements StorageApi {
   }
 
   public async listQuarantineRecords(
-    options: ListQuarantineRecordsOptions = {}
+    options: ListQuarantineRecordsOptions = {},
   ): Promise<QuarantineRecord[]> {
     const whereClauses: string[] = [];
     const parameters: string[] = [];
@@ -557,7 +561,7 @@ export class ClawGuardStorage implements StorageApi {
           FROM quarantine_entries
           ${whereSql}
           ORDER BY created_at DESC, quarantine_id DESC
-        `
+        `,
       )
       .all(...parameters) as unknown as QuarantineRow[];
 
@@ -571,10 +575,12 @@ export class ClawGuardStorage implements StorageApi {
   private applyMigrations(): void {
     const appliedVersions = new Set<number>(
       (
-        this.db.prepare("SELECT version FROM schema_migrations ORDER BY version ASC").all() as Array<{
+        this.db
+          .prepare("SELECT version FROM schema_migrations ORDER BY version ASC")
+          .all() as Array<{
           version: number;
         }>
-      ).map((row) => row.version)
+      ).map((row) => row.version),
     );
 
     for (const migration of storageMigrations) {
@@ -623,14 +629,16 @@ export class ClawGuardStorage implements StorageApi {
           FROM artifacts
           WHERE scan_id = ?
           ORDER BY created_at ASC, artifact_id ASC
-        `
+        `,
       )
       .all(scanId) as unknown as ArtifactRow[];
 
     return rows.map((row) => readStoredArtifactRecord(row, this.paths.artifactsRoot));
   }
 
-  private indexPreparedArtifact(preparedArtifact: Omit<PreparedArtifact, "artifactId">): StoredArtifactRecord {
+  private indexPreparedArtifact(
+    preparedArtifact: Omit<PreparedArtifact, "artifactId">,
+  ): StoredArtifactRecord {
     const artifactId = randomUUID();
 
     this.db
@@ -653,7 +661,7 @@ export class ClawGuardStorage implements StorageApi {
             sha256 = excluded.sha256,
             size_bytes = excluded.size_bytes,
             created_at = excluded.created_at
-        `
+        `,
       )
       .run(
         artifactId,
@@ -663,7 +671,7 @@ export class ClawGuardStorage implements StorageApi {
         preparedArtifact.mimeType,
         preparedArtifact.sha256,
         preparedArtifact.sizeBytes,
-        preparedArtifact.createdAt
+        preparedArtifact.createdAt,
       );
 
     const row = this.db
@@ -680,7 +688,7 @@ export class ClawGuardStorage implements StorageApi {
             created_at
           FROM artifacts
           WHERE scan_id = ? AND relative_path = ?
-        `
+        `,
       )
       .get(preparedArtifact.scanId, preparedArtifact.relativePath) as ArtifactRow | undefined;
 

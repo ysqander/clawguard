@@ -74,10 +74,9 @@ export const storageMigrations: StorageMigration[] = [
         )
       `,
       "CREATE INDEX IF NOT EXISTS quarantine_entries_state_idx ON quarantine_entries (state)",
-      "CREATE INDEX IF NOT EXISTS quarantine_entries_content_hash_idx ON quarantine_entries (content_hash)"
-    ]
-  }
+      "CREATE INDEX IF NOT EXISTS quarantine_entries_content_hash_idx ON quarantine_entries (content_hash)",
+    ],
+  },
 ];
 
 export const STORAGE_SCHEMA_VERSION = storageMigrations.at(-1)?.version ?? 0;
-

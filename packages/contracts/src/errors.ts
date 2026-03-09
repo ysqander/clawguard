@@ -12,4 +12,3 @@ export class SchemaValidationError extends Error {
     this.issues = issues;
   }
 }
-

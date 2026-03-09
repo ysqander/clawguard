@@ -7,7 +7,7 @@ import {
   parseLiteral,
   parseNonEmptyString,
   parseObject,
-  parseOptional
+  parseOptional,
 } from "./runtime.js";
 import {
   artifactRefValidator,
@@ -15,7 +15,7 @@ import {
   detonationReportValidator,
   reportSummaryValidator,
   scanRecordValidator,
-  staticScanReportValidator
+  staticScanReportValidator,
 } from "./domain.js";
 
 export const daemonCommands = [
@@ -25,7 +25,7 @@ export const daemonCommands = [
   "allow",
   "block",
   "detonate",
-  "audit"
+  "audit",
 ] as const;
 export type DaemonCommand = (typeof daemonCommands)[number];
 
@@ -144,13 +144,13 @@ function parseDaemonRequestPayload(input: unknown, path: string): DaemonRequestP
       case "scan":
         return {
           command,
-          skillPath: parseNonEmptyString(record.skillPath, `${path}.skillPath`)
+          skillPath: parseNonEmptyString(record.skillPath, `${path}.skillPath`),
         };
       case "report":
       case "detonate":
         return {
           command,
-          slug: parseNonEmptyString(record.slug, `${path}.slug`)
+          slug: parseNonEmptyString(record.slug, `${path}.slug`),
         };
       case "allow":
         return {
@@ -158,7 +158,7 @@ function parseDaemonRequestPayload(input: unknown, path: string): DaemonRequestP
           slug: parseNonEmptyString(record.slug, `${path}.slug`),
           ...(record.reason !== undefined
             ? { reason: parseNonEmptyString(record.reason, `${path}.reason`) }
-            : {})
+            : {}),
         };
       case "block":
         return {
@@ -166,7 +166,7 @@ function parseDaemonRequestPayload(input: unknown, path: string): DaemonRequestP
           slug: parseNonEmptyString(record.slug, `${path}.slug`),
           ...(record.reason !== undefined
             ? { reason: parseNonEmptyString(record.reason, `${path}.reason`) }
-            : {})
+            : {}),
         };
     }
   });
@@ -176,14 +176,14 @@ function parseDaemonRequestEnvelope(input: unknown, path: string): DaemonRequest
   return parseObject(input, path, (record) => ({
     version: parseLiteral(record.version, 1, `${path}.version`),
     requestId: parseNonEmptyString(record.requestId, `${path}.requestId`),
-    payload: parseDaemonRequestPayload(record.payload, `${path}.payload`)
+    payload: parseDaemonRequestPayload(record.payload, `${path}.payload`),
   }));
 }
 
 function parseStatusResponseData(input: unknown, path: string): StatusResponseData {
   return parseObject(input, path, (record) => ({
     state: parseEnum(record.state, ["idle", "busy", "degraded"] as const, `${path}.state`),
-    jobs: parseInteger(record.jobs, `${path}.jobs`)
+    jobs: parseInteger(record.jobs, `${path}.jobs`),
   }));
 }
 
@@ -193,33 +193,37 @@ function parseScanResponseData(input: unknown, path: string): ScanResponseData {
 
     return {
       scan: scanRecordValidator.parse(record.scan),
-      ...(report !== undefined ? { report } : {})
+      ...(report !== undefined ? { report } : {}),
     };
   });
 }
 
 function parseReportResponseData(input: unknown, path: string): ReportResponseData {
   return parseObject(input, path, (record) => {
-    const decision = parseOptional(record.decision, decisionRecordValidator.parse, `${path}.decision`);
+    const decision = parseOptional(
+      record.decision,
+      decisionRecordValidator.parse,
+      `${path}.decision`,
+    );
 
     return {
       summary: reportSummaryValidator.parse(record.summary),
       report: staticScanReportValidator.parse(record.report),
       ...(decision !== undefined ? { decision } : {}),
-      artifacts: parseArray(record.artifacts, artifactRefValidator.parse, `${path}.artifacts`)
+      artifacts: parseArray(record.artifacts, artifactRefValidator.parse, `${path}.artifacts`),
     };
   });
 }
 
 function parseDetonateResponseData(input: unknown, path: string): DetonateResponseData {
   return parseObject(input, path, (record) => ({
-    report: detonationReportValidator.parse(record.report)
+    report: detonationReportValidator.parse(record.report),
   }));
 }
 
 function parseAuditResponseData(input: unknown, path: string): AuditResponseData {
   return parseObject(input, path, (record) => ({
-    scans: parseArray(record.scans, scanRecordValidator.parse, `${path}.scans`)
+    scans: parseArray(record.scans, scanRecordValidator.parse, `${path}.scans`),
   }));
 }
 
@@ -253,7 +257,7 @@ function parseDaemonError(input: unknown, path: string): DaemonError {
   return parseObject(input, path, (record) => ({
     code: parseNonEmptyString(record.code, `${path}.code`),
     message: parseNonEmptyString(record.message, `${path}.message`),
-    retryable: parseBoolean(record.retryable, `${path}.retryable`)
+    retryable: parseBoolean(record.retryable, `${path}.retryable`),
   }));
 }
 
@@ -268,7 +272,7 @@ function parseDaemonResponseEnvelope(input: unknown, path: string): DaemonRespon
         version,
         requestId,
         ok,
-        data: parseSuccessData(record.data, `${path}.data`)
+        data: parseSuccessData(record.data, `${path}.data`),
       };
     }
 
@@ -276,16 +280,16 @@ function parseDaemonResponseEnvelope(input: unknown, path: string): DaemonRespon
       version,
       requestId,
       ok,
-      error: parseDaemonError(record.error, `${path}.error`)
+      error: parseDaemonError(record.error, `${path}.error`),
     };
   });
 }
 
 export const daemonRequestEnvelopeValidator = createValidator(
   parseDaemonRequestEnvelope,
-  "DaemonRequestEnvelope"
+  "DaemonRequestEnvelope",
 );
 export const daemonResponseEnvelopeValidator = createValidator(
   parseDaemonResponseEnvelope,
-  "DaemonResponseEnvelope"
+  "DaemonResponseEnvelope",
 );

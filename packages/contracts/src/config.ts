@@ -6,7 +6,7 @@ import {
   parseLiteral,
   parseNonEmptyString,
   parseObject,
-  parseStringArray
+  parseStringArray,
 } from "./runtime.js";
 import { detonationRuntimeKinds, type DetonationRuntimeKind } from "./domain.js";
 
@@ -75,15 +75,18 @@ function parsePathsConfig(input: unknown, path: string): PathsConfig {
     stateDbPath: parseNonEmptyString(record.stateDbPath, `${path}.stateDbPath`),
     artifactsRoot: parseNonEmptyString(record.artifactsRoot, `${path}.artifactsRoot`),
     socketPath: parseNonEmptyString(record.socketPath, `${path}.socketPath`),
-    quarantineSuffix: parseNonEmptyString(record.quarantineSuffix, `${path}.quarantineSuffix`)
+    quarantineSuffix: parseNonEmptyString(record.quarantineSuffix, `${path}.quarantineSuffix`),
   }));
 }
 
 function parseDiscoveryConfig(input: unknown, path: string): DiscoveryConfig {
   return parseObject(input, path, (record) => ({
-    openClawConfigPath: parseNonEmptyString(record.openClawConfigPath, `${path}.openClawConfigPath`),
+    openClawConfigPath: parseNonEmptyString(
+      record.openClawConfigPath,
+      `${path}.openClawConfigPath`,
+    ),
     managedSkillsPath: parseNonEmptyString(record.managedSkillsPath, `${path}.managedSkillsPath`),
-    fallbackSkillDirs: parseStringArray(record.fallbackSkillDirs, `${path}.fallbackSkillDirs`)
+    fallbackSkillDirs: parseStringArray(record.fallbackSkillDirs, `${path}.fallbackSkillDirs`),
   }));
 }
 
@@ -91,30 +94,34 @@ function parseDaemonConfig(input: unknown, path: string): DaemonConfig {
   return parseObject(input, path, (record) => ({
     debounceMs: parseInteger(record.debounceMs, `${path}.debounceMs`),
     maxConcurrentJobs: parseInteger(record.maxConcurrentJobs, `${path}.maxConcurrentJobs`),
-    notificationsEnabled: parseBoolean(record.notificationsEnabled, `${path}.notificationsEnabled`)
+    notificationsEnabled: parseBoolean(record.notificationsEnabled, `${path}.notificationsEnabled`),
   }));
 }
 
 function parseScanThresholdsConfig(input: unknown, path: string): ScanThresholdsConfig {
   return parseObject(input, path, (record) => ({
     quarantineScore: parseInteger(record.quarantineScore, `${path}.quarantineScore`),
-    detonationScore: parseInteger(record.detonationScore, `${path}.detonationScore`)
+    detonationScore: parseInteger(record.detonationScore, `${path}.detonationScore`),
   }));
 }
 
 function parseDetonationConfig(input: unknown, path: string): DetonationConfig {
   return parseObject(input, path, (record) => ({
     enabled: parseBoolean(record.enabled, `${path}.enabled`),
-    defaultRuntime: parseEnum(record.defaultRuntime, detonationRuntimeKinds, `${path}.defaultRuntime`),
+    defaultRuntime: parseEnum(
+      record.defaultRuntime,
+      detonationRuntimeKinds,
+      `${path}.defaultRuntime`,
+    ),
     timeoutSeconds: parseInteger(record.timeoutSeconds, `${path}.timeoutSeconds`),
-    promptBudget: parseInteger(record.promptBudget, `${path}.promptBudget`)
+    promptBudget: parseInteger(record.promptBudget, `${path}.promptBudget`),
   }));
 }
 
 function parseClawHubConfig(input: unknown, path: string): ClawHubConfig {
   return parseObject(input, path, (record) => ({
     baseUrl: parseNonEmptyString(record.baseUrl, `${path}.baseUrl`),
-    enabled: parseBoolean(record.enabled, `${path}.enabled`)
+    enabled: parseBoolean(record.enabled, `${path}.enabled`),
   }));
 }
 
@@ -123,16 +130,22 @@ function parseVirusTotalConfig(input: unknown, path: string): VirusTotalConfig {
     baseUrl: parseNonEmptyString(record.baseUrl, `${path}.baseUrl`),
     enabled: parseBoolean(record.enabled, `${path}.enabled`),
     hashLookupEnabled: parseBoolean(record.hashLookupEnabled, `${path}.hashLookupEnabled`),
-    backgroundUploadsEnabled: parseBoolean(record.backgroundUploadsEnabled, `${path}.backgroundUploadsEnabled`),
-    domainEnrichmentEnabled: parseBoolean(record.domainEnrichmentEnabled, `${path}.domainEnrichmentEnabled`),
-    maxRequestsPerMinute: parseInteger(record.maxRequestsPerMinute, `${path}.maxRequestsPerMinute`)
+    backgroundUploadsEnabled: parseBoolean(
+      record.backgroundUploadsEnabled,
+      `${path}.backgroundUploadsEnabled`,
+    ),
+    domainEnrichmentEnabled: parseBoolean(
+      record.domainEnrichmentEnabled,
+      `${path}.domainEnrichmentEnabled`,
+    ),
+    maxRequestsPerMinute: parseInteger(record.maxRequestsPerMinute, `${path}.maxRequestsPerMinute`),
   }));
 }
 
 function parseThreatIntelConfig(input: unknown, path: string): ThreatIntelConfig {
   return parseObject(input, path, (record) => ({
     clawHub: parseClawHubConfig(record.clawHub, `${path}.clawHub`),
-    virusTotal: parseVirusTotalConfig(record.virusTotal, `${path}.virusTotal`)
+    virusTotal: parseVirusTotalConfig(record.virusTotal, `${path}.virusTotal`),
   }));
 }
 
@@ -144,7 +157,7 @@ function parseClawGuardConfig(input: unknown, path: string): ClawGuardConfig {
     daemon: parseDaemonConfig(record.daemon, `${path}.daemon`),
     scanThresholds: parseScanThresholdsConfig(record.scanThresholds, `${path}.scanThresholds`),
     detonation: parseDetonationConfig(record.detonation, `${path}.detonation`),
-    threatIntel: parseThreatIntelConfig(record.threatIntel, `${path}.threatIntel`)
+    threatIntel: parseThreatIntelConfig(record.threatIntel, `${path}.threatIntel`),
   }));
 }
 
@@ -154,32 +167,32 @@ export const defaultClawGuardConfig: ClawGuardConfig = {
     stateDbPath: "~/Library/Application Support/ClawGuard/state.db",
     artifactsRoot: "~/Library/Application Support/ClawGuard/artifacts",
     socketPath: "~/Library/Application Support/ClawGuard/clawguard.sock",
-    quarantineSuffix: ".quarantine"
+    quarantineSuffix: ".quarantine",
   },
   discovery: {
     openClawConfigPath: "~/.openclaw/openclaw.json",
     managedSkillsPath: "~/.openclaw/skills",
-    fallbackSkillDirs: ["~/openclaw/skills", "./skills"]
+    fallbackSkillDirs: ["~/openclaw/skills", "./skills"],
   },
   daemon: {
     debounceMs: 500,
     maxConcurrentJobs: 2,
-    notificationsEnabled: true
+    notificationsEnabled: true,
   },
   scanThresholds: {
     quarantineScore: 60,
-    detonationScore: 40
+    detonationScore: 40,
   },
   detonation: {
     enabled: true,
     defaultRuntime: "podman",
     timeoutSeconds: 90,
-    promptBudget: 5
+    promptBudget: 5,
   },
   threatIntel: {
     clawHub: {
       baseUrl: "https://clawhub.ai",
-      enabled: true
+      enabled: true,
     },
     virusTotal: {
       baseUrl: "https://www.virustotal.com/api/v3",
@@ -187,16 +200,14 @@ export const defaultClawGuardConfig: ClawGuardConfig = {
       hashLookupEnabled: true,
       backgroundUploadsEnabled: false,
       domainEnrichmentEnabled: true,
-      maxRequestsPerMinute: 4
-    }
-  }
+      maxRequestsPerMinute: 4,
+    },
+  },
 };
 
 export const clawGuardConfigValidator = createValidator(parseClawGuardConfig, "ClawGuardConfig");
 
-export function mergeClawGuardConfig(
-  overrides: Partial<ClawGuardConfig>
-): ClawGuardConfig {
+export function mergeClawGuardConfig(overrides: Partial<ClawGuardConfig>): ClawGuardConfig {
   return {
     ...defaultClawGuardConfig,
     ...overrides,
@@ -208,12 +219,12 @@ export function mergeClawGuardConfig(
     threatIntel: {
       clawHub: {
         ...defaultClawGuardConfig.threatIntel.clawHub,
-        ...overrides.threatIntel?.clawHub
+        ...overrides.threatIntel?.clawHub,
       },
       virusTotal: {
         ...defaultClawGuardConfig.threatIntel.virusTotal,
-        ...overrides.threatIntel?.virusTotal
-      }
-    }
+        ...overrides.threatIntel?.virusTotal,
+      },
+    },
   };
 }

@@ -1,7 +1,7 @@
 import type {
   DetonationRuntimeKind,
   PlatformCapabilities,
-  SupportedPlatform
+  SupportedPlatform,
 } from "@clawguard/contracts";
 
 import type { CommandRunner } from "./shared/command-runner.js";
@@ -31,7 +31,7 @@ export interface FileWatcher {
   watchDirectory(
     directoryPath: string,
     handlers: WatchHandlers,
-    options?: WatchOptions
+    options?: WatchOptions,
   ): Promise<WatchSubscription>;
 }
 
@@ -86,7 +86,7 @@ export interface DetectedContainerRuntime {
 export interface ContainerRuntimeDetector {
   detectAvailableRuntimes(): Promise<DetectedContainerRuntime[]>;
   getPreferredRuntime(
-    preferredRuntime?: DetonationRuntimeKind
+    preferredRuntime?: DetonationRuntimeKind,
   ): Promise<DetectedContainerRuntime | undefined>;
 }
 

@@ -8,7 +8,7 @@ import {
   parseNonEmptyString,
   parseObject,
   parseOptional,
-  parseStringArray
+  parseStringArray,
 } from "./runtime.js";
 
 export const verdictLevels = ["unknown", "allow", "review", "block"] as const;
@@ -35,7 +35,7 @@ export const artifactTypes = [
   "memory-diff",
   "file-diff",
   "report-markdown",
-  "report-json"
+  "report-json",
 ] as const;
 export type ArtifactType = (typeof artifactTypes)[number];
 
@@ -47,7 +47,7 @@ export const daemonEventTypes = [
   "scan-completed",
   "detonation-completed",
   "quarantine-changed",
-  "notification-sent"
+  "notification-sent",
 ] as const;
 export type DaemonEventType = (typeof daemonEventTypes)[number];
 
@@ -220,7 +220,7 @@ export interface DaemonEvent {
 function parseSkillSourceHint(input: unknown, path: string): SkillSourceHint {
   return parseObject(input, path, (record) => ({
     kind: parseEnum(record.kind, skillSourceKinds, `${path}.kind`),
-    detail: parseNonEmptyString(record.detail, `${path}.detail`)
+    detail: parseNonEmptyString(record.detail, `${path}.detail`),
   }));
 }
 
@@ -237,14 +237,18 @@ function parseDiscoveredWorkspace(input: unknown, path: string): DiscoveredWorks
       exists: parseBoolean(record.exists, `${path}.exists`),
       precedence: parseInteger(record.precedence, `${path}.precedence`),
       ...(agentName !== undefined ? { agentName } : {}),
-      ...(isPrimary !== undefined ? { isPrimary } : {})
+      ...(isPrimary !== undefined ? { isPrimary } : {}),
     };
   });
 }
 
 function parseDiscoveredSkillRoot(input: unknown, path: string): DiscoveredSkillRoot {
   return parseObject(input, path, (record) => {
-    const workspaceId = parseOptional(record.workspaceId, parseNonEmptyString, `${path}.workspaceId`);
+    const workspaceId = parseOptional(
+      record.workspaceId,
+      parseNonEmptyString,
+      `${path}.workspaceId`,
+    );
 
     return {
       path: parseNonEmptyString(record.path, `${path}.path`),
@@ -252,7 +256,7 @@ function parseDiscoveredSkillRoot(input: unknown, path: string): DiscoveredSkill
       source: parseEnum(record.source, workspaceDiscoverySourceKinds, `${path}.source`),
       exists: parseBoolean(record.exists, `${path}.exists`),
       precedence: parseInteger(record.precedence, `${path}.precedence`),
-      ...(workspaceId !== undefined ? { workspaceId } : {})
+      ...(workspaceId !== undefined ? { workspaceId } : {}),
     };
   });
 }
@@ -267,7 +271,7 @@ function parseGatewayServiceSignal(input: unknown, path: string): GatewayService
       installed: parseBoolean(record.installed, `${path}.installed`),
       running: parseBoolean(record.running, `${path}.running`),
       checkedAt: parseIsoDateTime(record.checkedAt, `${path}.checkedAt`),
-      ...(detail !== undefined ? { detail } : {})
+      ...(detail !== undefined ? { detail } : {}),
     };
   });
 }
@@ -277,7 +281,7 @@ function parseOpenClawWorkspaceModel(input: unknown, path: string): OpenClawWork
     const primaryWorkspaceId = parseOptional(
       record.primaryWorkspaceId,
       parseNonEmptyString,
-      `${path}.primaryWorkspaceId`
+      `${path}.primaryWorkspaceId`,
     );
 
     return {
@@ -288,9 +292,9 @@ function parseOpenClawWorkspaceModel(input: unknown, path: string): OpenClawWork
       serviceSignals: parseArray(
         record.serviceSignals,
         parseGatewayServiceSignal,
-        `${path}.serviceSignals`
+        `${path}.serviceSignals`,
       ),
-      warnings: parseStringArray(record.warnings, `${path}.warnings`)
+      warnings: parseStringArray(record.warnings, `${path}.warnings`),
     };
   });
 }
@@ -302,7 +306,7 @@ function parseSkillSnapshot(input: unknown, path: string): SkillSnapshot {
     sourceHints: parseArray(record.sourceHints, parseSkillSourceHint, `${path}.sourceHints`),
     contentHash: parseNonEmptyString(record.contentHash, `${path}.contentHash`),
     fileInventory: parseStringArray(record.fileInventory, `${path}.fileInventory`),
-    detectedAt: parseIsoDateTime(record.detectedAt, `${path}.detectedAt`)
+    detectedAt: parseIsoDateTime(record.detectedAt, `${path}.detectedAt`),
   }));
 }
 
@@ -311,7 +315,7 @@ function parseStaticFinding(input: unknown, path: string): StaticFinding {
     ruleId: parseNonEmptyString(record.ruleId, `${path}.ruleId`),
     severity: parseEnum(record.severity, findingSeverities, `${path}.severity`),
     message: parseNonEmptyString(record.message, `${path}.message`),
-    evidence: parseStringArray(record.evidence, `${path}.evidence`)
+    evidence: parseStringArray(record.evidence, `${path}.evidence`),
   }));
 }
 
@@ -322,7 +326,7 @@ function parseStaticScanReport(input: unknown, path: string): StaticScanReport {
     score: parseInteger(record.score, `${path}.score`),
     findings: parseArray(record.findings, parseStaticFinding, `${path}.findings`),
     recommendation: parseEnum(record.recommendation, verdictLevels, `${path}.recommendation`),
-    generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`)
+    generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`),
   }));
 }
 
@@ -331,22 +335,22 @@ function parseThreatIntelVerdict(input: unknown, path: string): ThreatIntelVerdi
     const maliciousDetections = parseOptional(
       record.maliciousDetections,
       parseInteger,
-      `${path}.maliciousDetections`
+      `${path}.maliciousDetections`,
     );
     const suspiciousDetections = parseOptional(
       record.suspiciousDetections,
       parseInteger,
-      `${path}.suspiciousDetections`
+      `${path}.suspiciousDetections`,
     );
     const harmlessDetections = parseOptional(
       record.harmlessDetections,
       parseInteger,
-      `${path}.harmlessDetections`
+      `${path}.harmlessDetections`,
     );
     const undetectedDetections = parseOptional(
       record.undetectedDetections,
       parseInteger,
-      `${path}.undetectedDetections`
+      `${path}.undetectedDetections`,
     );
     const confidence = parseOptional(record.confidence, parseInteger, `${path}.confidence`);
     const sourceUrl = parseOptional(record.sourceUrl, parseNonEmptyString, `${path}.sourceUrl`);
@@ -363,7 +367,7 @@ function parseThreatIntelVerdict(input: unknown, path: string): ThreatIntelVerdi
       ...(undetectedDetections !== undefined ? { undetectedDetections } : {}),
       ...(confidence !== undefined ? { confidence } : {}),
       ...(sourceUrl !== undefined ? { sourceUrl } : {}),
-      observedAt: parseIsoDateTime(record.observedAt, `${path}.observedAt`)
+      observedAt: parseIsoDateTime(record.observedAt, `${path}.observedAt`),
     };
   });
 }
@@ -373,7 +377,7 @@ function parseArtifactRef(input: unknown, path: string): ArtifactRef {
     scanId: parseNonEmptyString(record.scanId, `${path}.scanId`),
     type: parseEnum(record.type, artifactTypes, `${path}.type`),
     path: parseNonEmptyString(record.path, `${path}.path`),
-    mimeType: parseNonEmptyString(record.mimeType, `${path}.mimeType`)
+    mimeType: parseNonEmptyString(record.mimeType, `${path}.mimeType`),
   }));
 }
 
@@ -382,7 +386,7 @@ function parseDetonationRequest(input: unknown, path: string): DetonationRequest
     requestId: parseNonEmptyString(record.requestId, `${path}.requestId`),
     snapshot: parseSkillSnapshot(record.snapshot, `${path}.snapshot`),
     prompts: parseStringArray(record.prompts, `${path}.prompts`),
-    timeoutSeconds: parseInteger(record.timeoutSeconds, `${path}.timeoutSeconds`)
+    timeoutSeconds: parseInteger(record.timeoutSeconds, `${path}.timeoutSeconds`),
   }));
 }
 
@@ -392,7 +396,7 @@ function parseDetonationReport(input: unknown, path: string): DetonationReport {
     summary: parseNonEmptyString(record.summary, `${path}.summary`),
     triggeredActions: parseStringArray(record.triggeredActions, `${path}.triggeredActions`),
     artifacts: parseArray(record.artifacts, parseArtifactRef, `${path}.artifacts`),
-    generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`)
+    generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`),
   }));
 }
 
@@ -401,7 +405,7 @@ function parseDecisionRecord(input: unknown, path: string): DecisionRecord {
     contentHash: parseNonEmptyString(record.contentHash, `${path}.contentHash`),
     decision: parseEnum(record.decision, decisionKinds, `${path}.decision`),
     reason: parseNonEmptyString(record.reason, `${path}.reason`),
-    createdAt: parseIsoDateTime(record.createdAt, `${path}.createdAt`)
+    createdAt: parseIsoDateTime(record.createdAt, `${path}.createdAt`),
   }));
 }
 
@@ -413,9 +417,13 @@ function parseScanRecord(input: unknown, path: string): ScanRecord {
       scanId: parseNonEmptyString(record.scanId, `${path}.scanId`),
       slug: parseNonEmptyString(record.slug, `${path}.slug`),
       contentHash: parseNonEmptyString(record.contentHash, `${path}.contentHash`),
-      status: parseEnum(record.status, ["pending", "completed", "failed"] as const, `${path}.status`),
+      status: parseEnum(
+        record.status,
+        ["pending", "completed", "failed"] as const,
+        `${path}.status`,
+      ),
       startedAt: parseIsoDateTime(record.startedAt, `${path}.startedAt`),
-      ...(completedAt !== undefined ? { completedAt } : {})
+      ...(completedAt !== undefined ? { completedAt } : {}),
     };
   });
 }
@@ -428,7 +436,7 @@ function parseReportSummary(input: unknown, path: string): ReportSummary {
     verdict: parseEnum(record.verdict, verdictLevels, `${path}.verdict`),
     score: parseInteger(record.score, `${path}.score`),
     findingCount: parseInteger(record.findingCount, `${path}.findingCount`),
-    generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`)
+    generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`),
   }));
 }
 
@@ -439,10 +447,14 @@ function parseDaemonJobRecord(input: unknown, path: string): DaemonJobRecord {
     return {
       jobId: parseNonEmptyString(record.jobId, `${path}.jobId`),
       kind: parseEnum(record.kind, ["scan", "detonate", "audit"] as const, `${path}.kind`),
-      status: parseEnum(record.status, ["queued", "running", "completed", "failed"] as const, `${path}.status`),
+      status: parseEnum(
+        record.status,
+        ["queued", "running", "completed", "failed"] as const,
+        `${path}.status`,
+      ),
       createdAt: parseIsoDateTime(record.createdAt, `${path}.createdAt`),
       updatedAt: parseIsoDateTime(record.updatedAt, `${path}.updatedAt`),
-      ...(slug !== undefined ? { slug } : {})
+      ...(slug !== undefined ? { slug } : {}),
     };
   });
 }
@@ -451,32 +463,38 @@ function parseDaemonEvent(input: unknown, path: string): DaemonEvent {
   return parseObject(input, path, (record) => ({
     type: parseEnum(record.type, daemonEventTypes, `${path}.type`),
     message: parseNonEmptyString(record.message, `${path}.message`),
-    timestamp: parseIsoDateTime(record.timestamp, `${path}.timestamp`)
+    timestamp: parseIsoDateTime(record.timestamp, `${path}.timestamp`),
   }));
 }
 
 export const skillSnapshotValidator = createValidator(parseSkillSnapshot, "SkillSnapshot");
 export const discoveredWorkspaceValidator = createValidator(
   parseDiscoveredWorkspace,
-  "DiscoveredWorkspace"
+  "DiscoveredWorkspace",
 );
 export const discoveredSkillRootValidator = createValidator(
   parseDiscoveredSkillRoot,
-  "DiscoveredSkillRoot"
+  "DiscoveredSkillRoot",
 );
 export const gatewayServiceSignalValidator = createValidator(
   parseGatewayServiceSignal,
-  "GatewayServiceSignal"
+  "GatewayServiceSignal",
 );
 export const openClawWorkspaceModelValidator = createValidator(
   parseOpenClawWorkspaceModel,
-  "OpenClawWorkspaceModel"
+  "OpenClawWorkspaceModel",
 );
 export const staticFindingValidator = createValidator(parseStaticFinding, "StaticFinding");
 export const staticScanReportValidator = createValidator(parseStaticScanReport, "StaticScanReport");
-export const threatIntelVerdictValidator = createValidator(parseThreatIntelVerdict, "ThreatIntelVerdict");
+export const threatIntelVerdictValidator = createValidator(
+  parseThreatIntelVerdict,
+  "ThreatIntelVerdict",
+);
 export const artifactRefValidator = createValidator(parseArtifactRef, "ArtifactRef");
-export const detonationRequestValidator = createValidator(parseDetonationRequest, "DetonationRequest");
+export const detonationRequestValidator = createValidator(
+  parseDetonationRequest,
+  "DetonationRequest",
+);
 export const detonationReportValidator = createValidator(parseDetonationReport, "DetonationReport");
 export const decisionRecordValidator = createValidator(parseDecisionRecord, "DecisionRecord");
 export const scanRecordValidator = createValidator(parseScanRecord, "ScanRecord");

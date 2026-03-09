@@ -9,29 +9,24 @@ export class MacosFileWatcher implements FileWatcher {
   async watchDirectory(
     directoryPath: string,
     handlers: WatchHandlers,
-    options: WatchOptions = {}
+    options: WatchOptions = {},
   ): Promise<WatchSubscription> {
     const watcher = this.watchFactory(
       directoryPath,
       {
         recursive: options.recursive ?? true,
-        signal: options.signal
+        signal: options.signal,
       },
       (eventType, fileName) => {
-        const relativePath =
-          fileName === null
-            ? ""
-            : typeof fileName === "string"
-              ? fileName
-              : "";
+        const relativePath = fileName === null ? "" : typeof fileName === "string" ? fileName : "";
 
         handlers.onEvent({
           path: relativePath.length > 0 ? path.join(directoryPath, relativePath) : directoryPath,
           kind: normalizeWatchEventType(eventType),
           rawEventType: isKnownWatchEventType(eventType) ? eventType : "unknown",
-          observedAt: new Date().toISOString()
+          observedAt: new Date().toISOString(),
         });
-      }
+      },
     );
 
     watcher.on("error", (error) => {
@@ -41,14 +36,12 @@ export class MacosFileWatcher implements FileWatcher {
     return {
       async close() {
         watcher.close();
-      }
+      },
     };
   }
 }
 
-export function normalizeWatchEventType(
-  eventType: string
-): "updated" | "renamed" | "unknown" {
+export function normalizeWatchEventType(eventType: string): "updated" | "renamed" | "unknown" {
   switch (eventType) {
     case "change":
       return "updated";

@@ -20,8 +20,11 @@ ClawGuard is a local-first skill auditor for OpenClaw agents. This repository is
 
 ```bash
 pnpm install
+pnpm lint
+pnpm format:check
 pnpm build
+pnpm typecheck
+pnpm test
 ```
 
-The scaffold intentionally contains compileable placeholders only. Feature work should follow the workstreams and tickets in [docs/clawguard-development-plan.md](/Users/alexanderadamov/Documents/macbook/Programming/clawguard/docs/clawguard-development-plan.md) and [docs/clawguard-ticket-breakdown.md](/Users/alexanderadamov/Documents/macbook/Programming/clawguard/docs/clawguard-ticket-breakdown.md).
-
+The repository now includes the foundation through OpenClaw workspace discovery. Current progress and remaining work are tracked in [docs/clawguard-development-plan.md](/Users/alexanderadamov/Documents/macbook/Programming/clawguard/docs/clawguard-development-plan.md) and [docs/clawguard-ticket-breakdown.md](/Users/alexanderadamov/Documents/macbook/Programming/clawguard/docs/clawguard-ticket-breakdown.md). The architecture decisions behind the current foundation live in [docs/adr/README.md](/Users/alexanderadamov/Documents/macbook/Programming/clawguard/docs/adr/README.md).

@@ -7,6 +7,6 @@ export function createPlaceholderScanReport(snapshot: SkillSnapshot): StaticScan
     score: 0,
     findings: [],
     recommendation: "unknown",
-    generatedAt: new Date(0).toISOString()
+    generatedAt: new Date(0).toISOString(),
   };
 }

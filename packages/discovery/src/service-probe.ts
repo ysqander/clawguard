@@ -13,14 +13,11 @@ export interface CommandResult {
 export type RunCommand = (
   command: string,
   args?: string[],
-  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv },
 ) => Promise<CommandResult>;
 
 export async function probeGatewayService(
-  options: {
-    now?: () => string;
-    runCommand?: RunCommand;
-  } = {}
+  options: { now?: () => string; runCommand?: RunCommand } = {},
 ): Promise<{ signal?: GatewayServiceSignal; warning?: string }> {
   const runCommand = options.runCommand ?? defaultRunCommand;
   const checkedAt = options.now?.() ?? new Date().toISOString();
@@ -32,7 +29,7 @@ export async function probeGatewayService(
     const result = await runCommand(command, args);
     if (result.exitCode !== 0) {
       return {
-        warning: `OpenClaw service probe failed: ${displayCommand} exited with ${result.exitCode}`
+        warning: `OpenClaw service probe failed: ${displayCommand} exited with ${result.exitCode}`,
       };
     }
 
@@ -46,13 +43,13 @@ export async function probeGatewayService(
         installed: signalState.installed,
         running: signalState.running,
         checkedAt,
-        ...(signalState.detail !== undefined ? { detail: signalState.detail } : {})
-      }
+        ...(signalState.detail !== undefined ? { detail: signalState.detail } : {}),
+      },
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
-      warning: `OpenClaw service probe unavailable: ${message}`
+      warning: `OpenClaw service probe unavailable: ${message}`,
     };
   }
 }
@@ -60,13 +57,13 @@ export async function probeGatewayService(
 async function defaultRunCommand(
   command: string,
   args: string[] = [],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}
+  options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},
 ): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env,
-      stdio: "pipe"
+      stdio: "pipe",
     });
 
     const stdoutChunks: Buffer[] = [];
@@ -85,7 +82,7 @@ async function defaultRunCommand(
         args: [...args],
         exitCode,
         stdout: Buffer.concat(stdoutChunks).toString("utf8"),
-        stderr: Buffer.concat(stderrChunks).toString("utf8")
+        stderr: Buffer.concat(stderrChunks).toString("utf8"),
       });
     });
   });
@@ -114,16 +111,19 @@ function extractSignalState(record: Record<string, unknown>): {
     return {
       installed: asBoolean(record.installed) ?? false,
       running: asBoolean(record.running) ?? false,
-      ...(typeof record.status === "string" ? { detail: record.status } : {})
+      ...(typeof record.status === "string" ? { detail: record.status } : {}),
     };
   }
 
   const gatewayRecord = asRecord(record.gateway);
-  if (gatewayRecord !== undefined && (hasBoolean(gatewayRecord.installed) || hasBoolean(gatewayRecord.running))) {
+  if (
+    gatewayRecord !== undefined &&
+    (hasBoolean(gatewayRecord.installed) || hasBoolean(gatewayRecord.running))
+  ) {
     return {
       installed: asBoolean(gatewayRecord.installed) ?? false,
       running: asBoolean(gatewayRecord.running) ?? false,
-      ...(typeof gatewayRecord.status === "string" ? { detail: gatewayRecord.status } : {})
+      ...(typeof gatewayRecord.status === "string" ? { detail: gatewayRecord.status } : {}),
     };
   }
 
@@ -149,7 +149,7 @@ function extractSignalState(record: Record<string, unknown>): {
     return {
       installed,
       running,
-      ...(serviceNames.length > 0 ? { detail: serviceNames.join(", ") } : {})
+      ...(serviceNames.length > 0 ? { detail: serviceNames.join(", ") } : {}),
     };
   }
 
@@ -169,4 +169,3 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     ? (value as Record<string, unknown>)
     : undefined;
 }
-

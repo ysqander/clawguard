@@ -20,21 +20,20 @@ export function expandHomePath(inputPath: string, homeDir = homedir()): string {
 export function createMacosStoragePaths(homeDir = homedir()): StoragePaths {
   return {
     stateDbPath: expandHomePath(defaultClawGuardConfig.paths.stateDbPath, homeDir),
-    artifactsRoot: expandHomePath(defaultClawGuardConfig.paths.artifactsRoot, homeDir)
+    artifactsRoot: expandHomePath(defaultClawGuardConfig.paths.artifactsRoot, homeDir),
   };
 }
 
 export function resolveStoragePaths(
   overrides: Partial<StoragePaths> = {},
-  homeDir = homedir()
+  homeDir = homedir(),
 ): StoragePaths {
   const basePaths = createMacosStoragePaths(homeDir);
 
   return {
     stateDbPath: expandHomePath(overrides.stateDbPath ?? basePaths.stateDbPath, homeDir),
-    artifactsRoot: expandHomePath(overrides.artifactsRoot ?? basePaths.artifactsRoot, homeDir)
+    artifactsRoot: expandHomePath(overrides.artifactsRoot ?? basePaths.artifactsRoot, homeDir),
   };
 }
 
 export const defaultMacosStoragePaths = createMacosStoragePaths();
-

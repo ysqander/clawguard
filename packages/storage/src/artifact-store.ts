@@ -19,7 +19,10 @@ export interface PreparedArtifact {
 }
 
 function sanitizeSegment(value: string): string {
-  return value.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/-+/g, "-").replace(/^[-.]+|[-.]+$/g, "");
+  return value
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
 }
 
 function normalizeArtifactFilename(filename: string, sha256: string): string {
@@ -34,7 +37,7 @@ function buildArtifactRelativePath(
   scanId: string,
   type: ArtifactType,
   filename: string,
-  sha256: string
+  sha256: string,
 ): string {
   const safeScanId = sanitizeSegment(scanId) || "scan";
   const safeType = sanitizeSegment(type) || "artifact";
@@ -53,13 +56,20 @@ export class ArtifactStore {
     await mkdir(this.artifactsRoot, { recursive: true });
   }
 
-  public async writeArtifact(input: WriteArtifactInput): Promise<Omit<PreparedArtifact, "artifactId">> {
+  public async writeArtifact(
+    input: WriteArtifactInput,
+  ): Promise<Omit<PreparedArtifact, "artifactId">> {
     await this.ensureRoot();
 
     const createdAt = input.createdAt ?? new Date().toISOString();
     const buffer = toBuffer(input.data, input.encoding ?? "utf8");
     const sha256 = createHash("sha256").update(buffer).digest("hex");
-    const relativePath = buildArtifactRelativePath(input.scanId, input.type, input.filename, sha256);
+    const relativePath = buildArtifactRelativePath(
+      input.scanId,
+      input.type,
+      input.filename,
+      sha256,
+    );
     const absolutePath = path.join(this.artifactsRoot, relativePath);
 
     await mkdir(path.dirname(absolutePath), { recursive: true });
@@ -73,17 +83,19 @@ export class ArtifactStore {
       mimeType: input.mimeType ?? "application/octet-stream",
       sha256,
       sizeBytes: buffer.byteLength,
-      createdAt
+      createdAt,
     };
   }
 
-  public async writeJsonArtifact(input: WriteJsonArtifactInput): Promise<Omit<PreparedArtifact, "artifactId">> {
+  public async writeJsonArtifact(
+    input: WriteJsonArtifactInput,
+  ): Promise<Omit<PreparedArtifact, "artifactId">> {
     const artifactInput: WriteArtifactInput = {
       scanId: input.scanId,
       type: input.type,
       filename: input.filename,
       data: `${JSON.stringify(input.value, null, 2)}\n`,
-      mimeType: input.mimeType ?? "application/json"
+      mimeType: input.mimeType ?? "application/json",
     };
 
     if (input.createdAt) {
@@ -93,4 +105,3 @@ export class ArtifactStore {
     return this.writeArtifact(artifactInput);
   }
 }
-

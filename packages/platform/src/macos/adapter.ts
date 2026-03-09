@@ -1,7 +1,4 @@
-import {
-  detonationRuntimeKinds,
-  type PlatformCapabilities
-} from "@clawguard/contracts";
+import { detonationRuntimeKinds, type PlatformCapabilities } from "@clawguard/contracts";
 
 import { UnsupportedPlatformError } from "../errors.js";
 import type { PlatformAdapter, PlatformFactoryOptions } from "../types.js";
@@ -16,11 +13,14 @@ const macosCapabilities: PlatformCapabilities = {
   supportsWatcher: true,
   supportsNotifications: true,
   supportsServiceInstall: true,
-  supportedDetonationRuntimes: [...detonationRuntimeKinds]
+  supportedDetonationRuntimes: [...detonationRuntimeKinds],
 };
 
 export function createMacosPlatformAdapter(
-  options: Pick<PlatformFactoryOptions, "commandRunner" | "homeDir" | "userId" | "watchFactory"> = {}
+  options: Pick<
+    PlatformFactoryOptions,
+    "commandRunner" | "homeDir" | "userId" | "watchFactory"
+  > = {},
 ): PlatformAdapter {
   const commandRunner = options.commandRunner ?? createCommandRunner();
   const watcher = new MacosFileWatcher(options.watchFactory);
@@ -31,9 +31,9 @@ export function createMacosPlatformAdapter(
     notifications: new MacosNotificationClient(commandRunner),
     services: new MacosServiceManager(commandRunner, {
       homeDir: options.homeDir ?? process.env.HOME ?? "",
-      userId: resolveUserId(options.userId)
+      userId: resolveUserId(options.userId),
     }),
-    containerRuntimes: createContainerRuntimeDetector({ commandRunner })
+    containerRuntimes: createContainerRuntimeDetector({ commandRunner }),
   };
 }
 
