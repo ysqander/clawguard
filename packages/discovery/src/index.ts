@@ -339,7 +339,9 @@ const ROOT_PRECEDENCE: Record<DiscoveredSkillRootKind, number> = {
 
 export type { RunCommand } from "./service-probe.js";
 export {
+  type ScheduledRootRescan,
   SkillWatcherPipeline,
+  type SkillWatcherPipelineErrorContext,
   resolveSkillPathFromEvent,
   type ScheduledSkillScan,
   type SkillWatcherPipelineOptions,
