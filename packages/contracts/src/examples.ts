@@ -23,6 +23,22 @@ export const exampleSkillSnapshot: SkillSnapshot = {
   contentHash: "sha256:example",
   fileInventory: ["SKILL.md", "scripts/install.sh"],
   detectedAt: "2026-03-08T00:00:00.000Z",
+  metadata: {
+    skillMd: {
+      path: "SKILL.md",
+      title: "Example Skill",
+      summary: "Installs a helper script for the local agent.",
+    },
+    manifests: [
+      {
+        path: "package.json",
+        name: "example-skill",
+        version: "1.0.0",
+        description: "Example package metadata",
+        keys: ["description", "name", "version"],
+      },
+    ],
+  },
 };
 
 export const exampleDiscoveredWorkspace: DiscoveredWorkspace = {

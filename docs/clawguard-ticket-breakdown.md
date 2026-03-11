@@ -10,12 +10,12 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-09, the repo has landed the main code and documentation for `CG-001` through `CG-006`.
+As of 2026-03-11, the repo has landed the main code and documentation for `CG-001` through `CG-008`.
 
 The next unfinished Milestone A tickets now start with:
 
-- `CG-007`: quarantine, allow, and block lifecycle
-- `CG-008`: `SkillSnapshot` production on top of the normalized discovery model
+- `CG-009`: static rule engine and scoring
+- `CG-010`: ClawHub API client
 
 ## Epic A: Monorepo Foundation
 
@@ -145,6 +145,7 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-003`, `CG-005`
+Status: `Complete`
 
 Scope:
 
@@ -165,6 +166,7 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-002`, `CG-005`
+Status: `Complete`
 
 Scope:
 

@@ -358,3 +358,10 @@ export type {
   RestoreSkillInput,
   SkillLifecycleManagerOptions,
 } from "./lifecycle.js";
+export { buildSkillSnapshot } from "./snapshot.js";
+export type {
+  BuildSkillSnapshotInput,
+  BuildSkillSnapshotOptions,
+  SkillSnapshotBuildError,
+  SkillSnapshotBuildResult,
+} from "./snapshot.js";

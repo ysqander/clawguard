@@ -5,6 +5,7 @@ import {
   parseEnum,
   parseInteger,
   parseIsoDateTime,
+  parseLiteral,
   parseNonEmptyString,
   parseObject,
   parseOptional,
@@ -114,6 +115,25 @@ export interface OpenClawWorkspaceModel {
   warnings: string[];
 }
 
+export interface SkillSnapshotMarkdownMetadata {
+  path: "SKILL.md";
+  title?: string;
+  summary?: string;
+}
+
+export interface SkillSnapshotManifestMetadata {
+  path: string;
+  name?: string;
+  version?: string;
+  description?: string;
+  keys: string[];
+}
+
+export interface SkillSnapshotMetadata {
+  skillMd: SkillSnapshotMarkdownMetadata;
+  manifests: SkillSnapshotManifestMetadata[];
+}
+
 export interface SkillSnapshot {
   slug: string;
   path: string;
@@ -121,6 +141,7 @@ export interface SkillSnapshot {
   contentHash: string;
   fileInventory: string[];
   detectedAt: string;
+  metadata?: SkillSnapshotMetadata;
 }
 
 export interface StaticFinding {
@@ -224,6 +245,56 @@ function parseSkillSourceHint(input: unknown, path: string): SkillSourceHint {
   }));
 }
 
+function parseSkillSnapshotMarkdownMetadata(
+  input: unknown,
+  path: string,
+): SkillSnapshotMarkdownMetadata {
+  return parseObject(input, path, (record) => {
+    const title = parseOptional(record.title, parseNonEmptyString, `${path}.title`);
+    const summary = parseOptional(record.summary, parseNonEmptyString, `${path}.summary`);
+
+    return {
+      path: parseLiteral(record.path, "SKILL.md", `${path}.path`),
+      ...(title !== undefined ? { title } : {}),
+      ...(summary !== undefined ? { summary } : {}),
+    };
+  });
+}
+
+function parseSkillSnapshotManifestMetadata(
+  input: unknown,
+  path: string,
+): SkillSnapshotManifestMetadata {
+  return parseObject(input, path, (record) => {
+    const name = parseOptional(record.name, parseNonEmptyString, `${path}.name`);
+    const version = parseOptional(record.version, parseNonEmptyString, `${path}.version`);
+    const description = parseOptional(
+      record.description,
+      parseNonEmptyString,
+      `${path}.description`,
+    );
+
+    return {
+      path: parseNonEmptyString(record.path, `${path}.path`),
+      keys: parseStringArray(record.keys, `${path}.keys`),
+      ...(name !== undefined ? { name } : {}),
+      ...(version !== undefined ? { version } : {}),
+      ...(description !== undefined ? { description } : {}),
+    };
+  });
+}
+
+function parseSkillSnapshotMetadata(input: unknown, path: string): SkillSnapshotMetadata {
+  return parseObject(input, path, (record) => ({
+    skillMd: parseSkillSnapshotMarkdownMetadata(record.skillMd, `${path}.skillMd`),
+    manifests: parseArray(
+      record.manifests,
+      parseSkillSnapshotManifestMetadata,
+      `${path}.manifests`,
+    ),
+  }));
+}
+
 function parseDiscoveredWorkspace(input: unknown, path: string): DiscoveredWorkspace {
   return parseObject(input, path, (record) => {
     const agentName = parseOptional(record.agentName, parseNonEmptyString, `${path}.agentName`);
@@ -300,14 +371,19 @@ function parseOpenClawWorkspaceModel(input: unknown, path: string): OpenClawWork
 }
 
 function parseSkillSnapshot(input: unknown, path: string): SkillSnapshot {
-  return parseObject(input, path, (record) => ({
-    slug: parseNonEmptyString(record.slug, `${path}.slug`),
-    path: parseNonEmptyString(record.path, `${path}.path`),
-    sourceHints: parseArray(record.sourceHints, parseSkillSourceHint, `${path}.sourceHints`),
-    contentHash: parseNonEmptyString(record.contentHash, `${path}.contentHash`),
-    fileInventory: parseStringArray(record.fileInventory, `${path}.fileInventory`),
-    detectedAt: parseIsoDateTime(record.detectedAt, `${path}.detectedAt`),
-  }));
+  return parseObject(input, path, (record) => {
+    const metadata = parseOptional(record.metadata, parseSkillSnapshotMetadata, `${path}.metadata`);
+
+    return {
+      slug: parseNonEmptyString(record.slug, `${path}.slug`),
+      path: parseNonEmptyString(record.path, `${path}.path`),
+      sourceHints: parseArray(record.sourceHints, parseSkillSourceHint, `${path}.sourceHints`),
+      contentHash: parseNonEmptyString(record.contentHash, `${path}.contentHash`),
+      fileInventory: parseStringArray(record.fileInventory, `${path}.fileInventory`),
+      detectedAt: parseIsoDateTime(record.detectedAt, `${path}.detectedAt`),
+      ...(metadata !== undefined ? { metadata } : {}),
+    };
+  });
 }
 
 function parseStaticFinding(input: unknown, path: string): StaticFinding {

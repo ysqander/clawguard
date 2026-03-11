@@ -4,11 +4,11 @@ This plan translates the product spec in `docs/clawguard-spec-v2.docx` into a de
 
 ## Current status snapshot
 
-As of 2026-03-09, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, and the OpenClaw workspace discovery model.
+As of 2026-03-11, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, and the quarantine lifecycle.
 
 The main post-foundation work now starts with:
 
-- watcher scheduling, quarantine flows, and skill snapshot production on top of the discovery model
+- skill snapshot production on top of the normalized discovery model
 - static scanner, threat-intelligence, reporting, and daemon orchestration work needed for the rest of Milestone A
 
 ## Confirmed architecture decisions
@@ -195,7 +195,8 @@ Scope:
 Outputs:
 
 - Discovery module that returns the normalized `OpenClawWorkspaceModel`.
-- Watcher pipeline that emits `SkillSnapshot` work from all discovered skill roots.
+- Watcher pipeline that schedules skill work from all discovered skill roots.
+- Snapshot builder that emits `SkillSnapshot` objects with discovery-derived source hints.
 - Quarantine lifecycle backed by SQLite state and artifact references.
 
 Dependencies:
