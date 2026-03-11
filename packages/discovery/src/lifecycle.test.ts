@@ -63,6 +63,67 @@ test("quarantine is non-destructive and reversible through restore", async (t) =
   assert.equal(decision?.decision, "allow");
 });
 
+test("delete removes a restored skill and blocklists its content hash", async (t) => {
+  const sandbox = await createSandbox("clawguard-lifecycle-");
+  t.after(async () => sandbox.cleanup());
+
+  const storage = createStorage({
+    stateDbPath: path.join(sandbox.root, "state.db"),
+    artifactsRoot: path.join(sandbox.root, "artifacts"),
+  });
+  t.after(() => storage.close());
+
+  const manager = new SkillLifecycleManager({ storage });
+  const skillPath = path.join(sandbox.root, "skills", "calendar-helper");
+  await mkdir(skillPath, { recursive: true });
+  await writeFile(path.join(skillPath, "SKILL.md"), "# Calendar Helper\n");
+
+  const quarantine = await manager.quarantineSkill({
+    skillSlug: "calendar-helper",
+    skillPath,
+    contentHash: "hash-delete-restored",
+  });
+
+  await manager.restoreSkill({ quarantineId: quarantine.quarantineId });
+  const deleted = await manager.deleteSkill({ quarantineId: quarantine.quarantineId });
+
+  assert.equal(deleted.state, "deleted");
+  assert.equal(await exists(skillPath), false);
+  assert.equal(await exists(quarantine.quarantinePath), false);
+
+  const decision = await storage.getDecision("hash-delete-restored");
+  assert.equal(decision?.decision, "block");
+});
+
+test("delete rejects quarantine entries that are already deleted", async (t) => {
+  const sandbox = await createSandbox("clawguard-lifecycle-");
+  t.after(async () => sandbox.cleanup());
+
+  const storage = createStorage({
+    stateDbPath: path.join(sandbox.root, "state.db"),
+    artifactsRoot: path.join(sandbox.root, "artifacts"),
+  });
+  t.after(() => storage.close());
+
+  const manager = new SkillLifecycleManager({ storage });
+  const skillPath = path.join(sandbox.root, "skills", "calendar-helper");
+  await mkdir(skillPath, { recursive: true });
+  await writeFile(path.join(skillPath, "SKILL.md"), "# Calendar Helper\n");
+
+  const quarantine = await manager.quarantineSkill({
+    skillSlug: "calendar-helper",
+    skillPath,
+    contentHash: "hash-delete-twice",
+  });
+
+  await manager.deleteSkill({ quarantineId: quarantine.quarantineId });
+
+  await assert.rejects(
+    manager.deleteSkill({ quarantineId: quarantine.quarantineId }),
+    /Cannot delete quarantine entry .* twice/,
+  );
+});
+
 test("allowed hashes bypass repeat quarantine until content changes", async (t) => {
   const sandbox = await createSandbox("clawguard-lifecycle-");
   t.after(async () => sandbox.cleanup());
@@ -122,5 +183,37 @@ test("blocked hashes are rejected on reappearance", async (t) => {
   });
 
   assert.equal(resolution.status, "blocked");
+  assert.equal(await exists(skillPath), false);
+});
+
+test("quarantine retries with a suffixed path when the first quarantine target is not empty", async (t) => {
+  const sandbox = await createSandbox("clawguard-lifecycle-");
+  t.after(async () => sandbox.cleanup());
+
+  const storage = createStorage({
+    stateDbPath: path.join(sandbox.root, "state.db"),
+    artifactsRoot: path.join(sandbox.root, "artifacts"),
+  });
+  t.after(() => storage.close());
+
+  const manager = new SkillLifecycleManager({ storage });
+  const skillsRoot = path.join(sandbox.root, "skills");
+  const skillPath = path.join(skillsRoot, "collision-skill");
+  const occupiedQuarantinePath = `${skillPath}.quarantine`;
+
+  await mkdir(skillPath, { recursive: true });
+  await writeFile(path.join(skillPath, "SKILL.md"), "# First version\n");
+  await mkdir(occupiedQuarantinePath, { recursive: true });
+  await writeFile(path.join(occupiedQuarantinePath, "SKILL.md"), "# Existing quarantine\n");
+
+  const quarantine = await manager.quarantineSkill({
+    skillSlug: "collision-skill",
+    skillPath,
+    contentHash: "hash-collision",
+  });
+
+  assert.equal(quarantine.quarantinePath, `${occupiedQuarantinePath}-1`);
+  assert.equal(await exists(occupiedQuarantinePath), true);
+  assert.equal(await exists(quarantine.quarantinePath), true);
   assert.equal(await exists(skillPath), false);
 });

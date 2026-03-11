@@ -166,7 +166,12 @@ export class SkillLifecycleManager {
       throw new Error(`Unknown quarantine entry: ${input.quarantineId}`);
     }
 
-    await rm(record.quarantinePath, { recursive: true, force: true });
+    if (record.state === "deleted") {
+      throw new Error(`Cannot delete quarantine entry ${input.quarantineId} twice`);
+    }
+
+    const pathToDelete = record.state === "restored" ? record.originalPath : record.quarantinePath;
+    await rm(pathToDelete, { recursive: true, force: true });
 
     const updated = await this.storage.setQuarantineState(input.quarantineId, "deleted");
     if (!updated) {
@@ -195,7 +200,7 @@ async function moveToQuarantine(skillPath: string, quarantineSuffix: string): Pr
       return candidatePath;
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
-      if (code === "EEXIST") {
+      if (code === "EEXIST" || code === "ENOTEMPTY") {
         continue;
       }
 
