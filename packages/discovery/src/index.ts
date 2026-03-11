@@ -346,3 +346,15 @@ export {
   type ScheduledSkillScan,
   type SkillWatcherPipelineOptions,
 } from "./watcher-pipeline.js";
+
+export { SkillLifecycleManager } from "./lifecycle.js";
+export type {
+  AllowHashInput,
+  BlockHashInput,
+  DeleteSkillInput,
+  LifecycleResolution,
+  QuarantineSkillInput,
+  ResolveSkillLifecycleInput,
+  RestoreSkillInput,
+  SkillLifecycleManagerOptions,
+} from "./lifecycle.js";

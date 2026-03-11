@@ -472,40 +472,15 @@ export class ClawGuardStorage implements StorageApi {
         updatedAt,
       );
 
-    const row = this.db
-      .prepare(
-        `
-          SELECT
-            quarantine_id,
-            scan_id,
-            skill_slug,
-            content_hash,
-            original_path,
-            quarantine_path,
-            state,
-            created_at,
-            updated_at
-          FROM quarantine_entries
-          WHERE quarantine_id = ?
-        `,
-      )
-      .get(quarantineId) as QuarantineRow | undefined;
-
-    if (!row) {
+    const record = await this.getQuarantineRecord(quarantineId);
+    if (!record) {
       throw new Error(`Failed to read quarantine entry ${quarantineId}`);
     }
 
-    return readQuarantineRecord(row);
+    return record;
   }
 
-  public async setQuarantineState(
-    quarantineId: string,
-    state: QuarantineState,
-  ): Promise<QuarantineRecord | undefined> {
-    this.db
-      .prepare("UPDATE quarantine_entries SET state = ?, updated_at = ? WHERE quarantine_id = ?")
-      .run(state, new Date().toISOString(), quarantineId);
-
+  public async getQuarantineRecord(quarantineId: string): Promise<QuarantineRecord | undefined> {
     const row = this.db
       .prepare(
         `
@@ -526,6 +501,17 @@ export class ClawGuardStorage implements StorageApi {
       .get(quarantineId) as QuarantineRow | undefined;
 
     return row ? readQuarantineRecord(row) : undefined;
+  }
+
+  public async setQuarantineState(
+    quarantineId: string,
+    state: QuarantineState,
+  ): Promise<QuarantineRecord | undefined> {
+    this.db
+      .prepare("UPDATE quarantine_entries SET state = ?, updated_at = ? WHERE quarantine_id = ?")
+      .run(state, new Date().toISOString(), quarantineId);
+
+    return this.getQuarantineRecord(quarantineId);
   }
 
   public async listQuarantineRecords(
