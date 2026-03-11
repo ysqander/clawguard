@@ -108,6 +108,7 @@ export interface StorageApi {
   upsertDecision(input: UpsertDecisionInput): Promise<DecisionRecord>;
   getDecision(contentHash: string): Promise<DecisionRecord | undefined>;
   createQuarantineRecord(input: CreateQuarantineRecordInput): Promise<QuarantineRecord>;
+  getQuarantineRecord(quarantineId: string): Promise<QuarantineRecord | undefined>;
   setQuarantineState(
     quarantineId: string,
     state: QuarantineState,

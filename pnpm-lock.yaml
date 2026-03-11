@@ -73,6 +73,9 @@ importers:
       '@clawguard/platform':
         specifier: workspace:*
         version: link:../platform
+      '@clawguard/storage':
+        specifier: workspace:*
+        version: link:../storage
       json5:
         specifier: ^2.2.3
         version: 2.2.3

@@ -338,3 +338,15 @@ const ROOT_PRECEDENCE: Record<DiscoveredSkillRootKind, number> = {
 };
 
 export type { RunCommand } from "./service-probe.js";
+
+export { SkillLifecycleManager } from "./lifecycle.js";
+export type {
+  AllowHashInput,
+  BlockHashInput,
+  DeleteSkillInput,
+  LifecycleResolution,
+  QuarantineSkillInput,
+  ResolveSkillLifecycleInput,
+  RestoreSkillInput,
+  SkillLifecycleManagerOptions,
+} from "./lifecycle.js";
