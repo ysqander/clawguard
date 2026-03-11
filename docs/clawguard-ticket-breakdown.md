@@ -10,12 +10,13 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-11, the repo has landed the main code and documentation for `CG-001` through `CG-008`.
+As of 2026-03-12, the repo has landed the main code and documentation for `CG-001` through `CG-008`.
 
 The next unfinished Milestone A tickets now start with:
 
 - `CG-009`: static rule engine and scoring
 - `CG-010`: ClawHub API client
+- `CG-011`: VirusTotal client, caching, and quota control
 
 ## Epic A: Monorepo Foundation
 
@@ -448,17 +449,15 @@ Start with:
 - `CG-002`
 - `CG-020`
 
-Then run in parallel:
+Current recommended parallel work:
 
-- `CG-003`
-- `CG-004`
-- `CG-005`
-- `CG-008`
+- `CG-009`
 - `CG-010`
+- `CG-011`
 
 Static MVP critical path:
 
-- `CG-006` -> `CG-007` -> `CG-009` -> `CG-011` -> `CG-012` -> `CG-017` -> `CG-018`
+- `CG-009` + `CG-010` + `CG-011` -> `CG-012` -> `CG-017` -> `CG-018`
 
 Behavioral MVP critical path:
 
