@@ -38,11 +38,13 @@ export class HttpClawHubClient {
       return null;
     }
 
-    const response = await this.requestJson(`/api/v1/skills/${encodeURIComponent(slug)}`);
+    const requestPath = `/api/v1/skills/${encodeURIComponent(slug)}`;
+    const response = await this.request(requestPath);
     if (response.status === 404) {
       return null;
     }
 
+    this.assertJsonResponse(requestPath, response);
     const body = await response.json();
     const metadata = isRecord(body) ? body : {};
 
@@ -106,12 +108,15 @@ export class HttpClawHubClient {
 
   private async requestJson(path: string): Promise<Response> {
     const response = await this.request(path);
+    this.assertJsonResponse(path, response);
+    return response;
+  }
+
+  private assertJsonResponse(path: string, response: Response): void {
     const contentType = response.headers.get("content-type") ?? "";
     if (!contentType.includes("application/json")) {
       throw new Error(`Expected JSON response for ${path}`);
     }
-
-    return response;
   }
 
   private async request(path: string): Promise<Response> {

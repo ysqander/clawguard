@@ -44,6 +44,20 @@ test("getSkill extracts explicit provider verdicts", async () => {
   assert.equal(result.virusTotalVerdict.maliciousDetections, 12);
 });
 
+test("getSkill returns null for text/plain 404 responses", async () => {
+  const client = new HttpClawHubClient({
+    baseUrl: "https://clawhub.test",
+    fetchImpl: async () =>
+      new Response("Skill not found", {
+        status: 404,
+        headers: { "content-type": "text/plain; charset=utf-8" },
+      }),
+  });
+
+  const result = await client.getSkill("missing-skill");
+  assert.equal(result, null);
+});
+
 test("getSkillMarkdown requests remote SKILL.md and returns content", async () => {
   let calledUrl = "";
   const client = new HttpClawHubClient({
