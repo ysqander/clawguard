@@ -16,7 +16,7 @@ The next unfinished Milestone A tickets now start with:
 
 - `CG-009`: static rule engine and scoring
 - `CG-010`: ClawHub API client
-- `CG-011`: VirusTotal client, caching, and quota control
+- `CG-012`: static report synthesis
 
 ## Epic A: Monorepo Foundation
 
@@ -223,6 +223,7 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-002`, `CG-003`
+Status: `Complete`
 
 Scope:
 
