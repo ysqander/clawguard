@@ -77,13 +77,10 @@ export class HttpClawHubClient {
 
     const response = await this.requestJson(`/api/v1/skills?sort=${encodeURIComponent(sort)}`);
     const payload = await response.json();
-
-    if (!Array.isArray(payload)) {
-      return [];
-    }
+    const items = Array.isArray(payload) ? payload : isRecord(payload) && Array.isArray(payload.items) ? payload.items : [];
 
     const entries: ClawHubSkillListEntry[] = [];
-    for (const item of payload) {
+    for (const item of items) {
       if (!isRecord(item)) {
         continue;
       }
@@ -93,8 +90,8 @@ export class HttpClawHubClient {
         continue;
       }
 
-      const name = asString(item.name);
-      const description = asString(item.description);
+      const name = asString(item.displayName) ?? asString(item.name);
+      const description = asString(item.summary) ?? asString(item.description);
 
       entries.push({
         slug,

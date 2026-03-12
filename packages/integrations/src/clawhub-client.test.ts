@@ -83,11 +83,14 @@ test("listSkills supports sorting endpoint", async () => {
     fetchImpl: async (input) => {
       calledUrl = String(input);
       return new Response(
-        JSON.stringify([
-          { slug: "first", name: "First" },
-          { slug: "second", description: "Second skill" },
-          { name: "missing-slug" },
-        ]),
+        JSON.stringify({
+          items: [
+            { slug: "first", displayName: "First" },
+            { slug: "second", summary: "Second skill" },
+            { displayName: "missing-slug" },
+          ],
+          nextCursor: null,
+        }),
         {
           status: 200,
           headers: { "content-type": "application/json" },
