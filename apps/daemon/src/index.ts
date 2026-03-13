@@ -225,7 +225,7 @@ export class DaemonServer {
           return this.successResponse(request.requestId, this.toReportResponse(refreshedReport));
         }
         case "audit":
-          return this.successResponse(request.requestId, { scans: [] });
+          return this.successResponse(request.requestId, { scans: await this.storage.listScans() });
         case "detonate":
           return this.errorResponse(
             request.requestId,

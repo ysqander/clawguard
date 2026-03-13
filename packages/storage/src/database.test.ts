@@ -138,6 +138,22 @@ test("ClawGuardStorage returns the newest stored report for a repeated content h
   assert.equal(stored.summary.scanId, laterScan.scanId);
 });
 
+test("ClawGuardStorage lists scans newest-first", async (t) => {
+  const storage = createStorageFixture(t);
+  const earlierScan = buildScan("scan-001", "2026-03-12T00:00:00.000Z");
+  const laterScan = buildScan("scan-002", "2026-03-12T00:10:00.000Z", "sha256:newer");
+
+  await storage.persistScan({ scan: earlierScan });
+  await storage.persistScan({ scan: laterScan });
+
+  const scans = await storage.listScans();
+
+  assert.deepEqual(
+    scans.map((scan) => scan.scanId),
+    [laterScan.scanId, earlierScan.scanId],
+  );
+});
+
 test("ClawGuardStorage returns undefined for an unknown report content hash", async (t) => {
   const storage = createStorageFixture(t);
 

@@ -246,6 +246,27 @@ export class ClawGuardStorage implements StorageApi {
     return row ? readScanRecord(row) : undefined;
   }
 
+  public async listScans(): Promise<ScanRecord[]> {
+    const rows = this.db
+      .prepare(
+        `
+          SELECT
+            scan_id,
+            skill_slug,
+            content_hash,
+            status,
+            started_at,
+            completed_at,
+            scan_json
+          FROM scans
+          ORDER BY started_at DESC, scan_id DESC
+        `,
+      )
+      .all() as unknown as ScanRow[];
+
+    return rows.map((row) => readScanRecord(row));
+  }
+
   public async findLatestScanBySlug(slug: string): Promise<ScanRecord | undefined> {
     const row = this.db
       .prepare("SELECT scan_id FROM scans WHERE skill_slug = ? ORDER BY started_at DESC LIMIT 1")

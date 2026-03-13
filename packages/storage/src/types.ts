@@ -98,6 +98,7 @@ export interface StorageApi {
   readonly schemaVersion: number;
   persistScan(input: PersistScanInput): Promise<ScanRecord>;
   getScan(scanId: string): Promise<ScanRecord | undefined>;
+  listScans(): Promise<ScanRecord[]>;
   findLatestScanBySlug(slug: string): Promise<ScanRecord | undefined>;
   findLatestScanByContentHash(contentHash: string): Promise<ScanRecord | undefined>;
   persistStaticReport(input: PersistStaticReportInput): Promise<StoredStaticReport>;
