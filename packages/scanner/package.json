@@ -8,6 +8,7 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },
@@ -15,10 +16,16 @@
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
     "clean": "tsc -b --clean",
-    "test": "node --test \"dist/**/*.test.js\""
+    "test": "node --test \"dist/**/*.test.js\"",
+    "bench:static": "node --conditions=source --import tsx ./src/benchmark-static.ts",
+    "bench:static:ci": "CLAWGUARD_BENCH_STATIC_ENFORCE=1 node --conditions=source --import tsx ./src/benchmark-static.ts"
   },
   "dependencies": {
     "@clawguard/contracts": "workspace:*",
-    "@clawguard/integrations": "workspace:*"
+    "@clawguard/integrations": "workspace:*",
+    "@clawguard/fixtures": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
   }
 }

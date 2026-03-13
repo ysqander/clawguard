@@ -10,16 +10,20 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-12, the repo has landed the main code and documentation for `CG-001` through `CG-012`.
+As of 2026-03-13, the repo has landed the main code and documentation for `CG-001` through `CG-012`.
+
+`CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness, but full detonation execution benchmarking remains blocked on `CG-013` through `CG-016`.
 
 The next unfinished Milestone A tickets now start with:
 
 - `CG-017`: daemon job orchestration and IPC
 - `CG-018`: CLI commands and output formatting
 
+`CG-020` remains partially complete until detonation execution benchmarking can land on top of `CG-013` through `CG-016`.
+
 ## Epic A: Monorepo Foundation
 
-### CG-001 Initialize the monorepo and CI
+### CG-001 Initialize the monorepo and validation workflow
 
 Priority: `P0`
 Milestone: `A`
@@ -30,13 +34,13 @@ Scope:
 
 - Create `apps/` and `packages/` workspace layout.
 - Set up TypeScript project references, linting, formatting, tests, and publishable package builds.
-- Add CI for install, build, lint, and test.
+- Add a shared validation workflow for install, build, lint, and test.
 
 Acceptance criteria:
 
 - The repo builds from a clean checkout.
 - `apps/daemon` and `apps/cli` can import shared packages.
-- CI runs on every push with green install, build, typecheck, and test checks.
+- Local validation commands cover install, build, typecheck, lint, and test checks.
 - Lint and format commands are wired into the workspace and documented.
 
 ### CG-002 Define shared contracts and configuration schema
@@ -405,8 +409,12 @@ Scope:
 Acceptance criteria:
 
 - Fixtures are reusable across unit, integration, and end-to-end tests.
-- Static benchmark output is automated in CI or a gated local workflow.
+- Static benchmark output is automated in a gated local workflow.
 - Fixture coverage includes high-quality benign skills to track false positives.
+
+Note:
+
+- Full detonation execution benchmarking remains blocked on `CG-013` through `CG-016`; the current repo only includes a detonation runtime-readiness preflight harness.
 
 ### CG-021 Implement end-to-end regression and security validation
 

@@ -70,9 +70,7 @@ interface PendingRootRescanBatch {
   timer: NodeJS.Timeout;
 }
 
-type WatchEventTarget =
-  | { kind: "skill"; skillPath: string }
-  | { kind: "root" };
+type WatchEventTarget = { kind: "skill"; skillPath: string } | { kind: "root" };
 
 export class SkillWatcherPipeline {
   private readonly debounceMs: number;
@@ -204,7 +202,11 @@ export class SkillWatcherPipeline {
     }
   }
 
-  private queueSkillScan(root: DiscoveredSkillRoot, skillPath: string, event: FileWatchEvent): void {
+  private queueSkillScan(
+    root: DiscoveredSkillRoot,
+    skillPath: string,
+    event: FileWatchEvent,
+  ): void {
     const existing = this.pendingScans.get(skillPath);
     if (existing !== undefined) {
       existing.events.push(event);
@@ -330,10 +332,7 @@ export class SkillWatcherPipeline {
   }
 }
 
-export function resolveSkillPathFromEvent(
-  rootPath: string,
-  eventPath: string,
-): string | undefined {
+export function resolveSkillPathFromEvent(rootPath: string, eventPath: string): string | undefined {
   const relativePath = path.relative(rootPath, eventPath);
   if (relativePath.startsWith("..") || path.isAbsolute(relativePath) || relativePath.length === 0) {
     return undefined;
@@ -347,7 +346,10 @@ export function resolveSkillPathFromEvent(
   return path.join(rootPath, skillSlug);
 }
 
-function resolveWatchEventTarget(rootPath: string, eventPath: string): WatchEventTarget | undefined {
+function resolveWatchEventTarget(
+  rootPath: string,
+  eventPath: string,
+): WatchEventTarget | undefined {
   if (path.normalize(eventPath) === path.normalize(rootPath)) {
     return { kind: "root" };
   }

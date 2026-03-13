@@ -4,7 +4,7 @@ This plan translates the product spec in `docs/clawguard-spec-v2.docx` into a de
 
 ## Current status snapshot
 
-As of 2026-03-12, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, and static report synthesis that merges local findings with enrichment signals.
+As of 2026-03-13, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, static report synthesis that merges local findings with enrichment signals, and the first reusable fixture corpus plus a gated static benchmark harness and initial detonation preflight harness.
 
 The main remaining Milestone A work now centers on:
 
@@ -152,7 +152,7 @@ Scope:
 
 Current status:
 
-- Monorepo package boundaries, builds, typechecks, tests, lint/format tooling, CI, and ADRs are in place.
+- Monorepo package boundaries, builds, typechecks, tests, lint/format tooling, and ADRs are in place.
 
 Outputs:
 
@@ -307,7 +307,7 @@ Scope:
 Outputs:
 
 - Shared fixture corpus.
-- Benchmark and regression gates in CI.
+- Benchmark and regression gates in local validation workflows.
 - Launch-ready docs with honest security caveats.
 
 Dependencies:

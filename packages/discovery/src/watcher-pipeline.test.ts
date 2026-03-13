@@ -18,10 +18,16 @@ import {
 
 test("resolveSkillPathFromEvent maps nested changes to the top-level skill dir", () => {
   assert.equal(
-    resolveSkillPathFromEvent("/tmp/workspace/skills", "/tmp/workspace/skills/example/src/index.ts"),
+    resolveSkillPathFromEvent(
+      "/tmp/workspace/skills",
+      "/tmp/workspace/skills/example/src/index.ts",
+    ),
     "/tmp/workspace/skills/example",
   );
-  assert.equal(resolveSkillPathFromEvent("/tmp/workspace/skills", "/tmp/other/location"), undefined);
+  assert.equal(
+    resolveSkillPathFromEvent("/tmp/workspace/skills", "/tmp/other/location"),
+    undefined,
+  );
 });
 
 test("coalesces repeated file writes into one scheduled scan per skill", async () => {
@@ -107,10 +113,7 @@ test("watches all discovered roots and recovers after transient watch failures",
     "/tmp/managed-skills=>clock",
   ]);
   assert.deepEqual(rootRescans, ["/tmp/extra-skills"]);
-  assert.deepEqual(
-    errors.map((error) => error.phase).sort(),
-    ["watch-runtime", "watch-start"],
-  );
+  assert.deepEqual(errors.map((error) => error.phase).sort(), ["watch-runtime", "watch-start"]);
 
   await pipeline.stop();
 });
@@ -178,7 +181,10 @@ test("routes scan scheduling failures to onError without unhandled rejections", 
 
   try {
     await pipeline.start();
-    fakeWatcher.emit("/tmp/workspace/skills", createEvent("/tmp/workspace/skills/weather/SKILL.md"));
+    fakeWatcher.emit(
+      "/tmp/workspace/skills",
+      createEvent("/tmp/workspace/skills/weather/SKILL.md"),
+    );
 
     await wait(30);
 

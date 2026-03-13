@@ -1,10 +1,6 @@
 import { createHash } from "node:crypto";
-import {
-  lstat,
-  readdir,
-  readFile,
-  readlink,
-} from "node:fs/promises";
+import type { Dirent, Stats } from "node:fs";
+import { lstat, readdir, readFile, readlink } from "node:fs/promises";
 import path from "node:path";
 
 import type {
@@ -60,13 +56,18 @@ export async function buildSkillSnapshot(
 ): Promise<SkillSnapshotBuildResult> {
   const skillSlug = input.skillSlug ?? path.basename(input.skillPath);
 
-  let skillStats;
+  let skillStats: Stats;
   try {
     skillStats = await lstat(input.skillPath);
   } catch {
     return {
       ok: false,
-      error: snapshotError("missing-skill", input.skillPath, skillSlug, "Skill directory was not found"),
+      error: snapshotError(
+        "missing-skill",
+        input.skillPath,
+        skillSlug,
+        "Skill directory was not found",
+      ),
     };
   }
 
@@ -127,10 +128,7 @@ export async function buildSkillSnapshot(
 async function walkSkillEntries(
   skillPath: string,
   skillSlug: string,
-): Promise<
-  | { ok: true; entries: FileEntry[] }
-  | { ok: false; error: SkillSnapshotBuildError }
-> {
+): Promise<{ ok: true; entries: FileEntry[] } | { ok: false; error: SkillSnapshotBuildError }> {
   const entries: FileEntry[] = [];
   const pendingDirectories = [skillPath];
 
@@ -140,7 +138,7 @@ async function walkSkillEntries(
       break;
     }
 
-    let childEntries;
+    let childEntries: Dirent[];
     try {
       childEntries = await readdir(currentDirectory, { withFileTypes: true });
     } catch (error) {
@@ -219,8 +217,7 @@ async function parseSnapshotMetadata(
   entries: FileEntry[],
   skillMdEntry: FileEntry,
 ): Promise<
-  | { ok: true; metadata: SkillSnapshotMetadata }
-  | { ok: false; error: SkillSnapshotBuildError }
+  { ok: true; metadata: SkillSnapshotMetadata } | { ok: false; error: SkillSnapshotBuildError }
 > {
   const manifestEntries = new Map(entries.map((entry) => [entry.relativePath, entry]));
   const manifests: SkillSnapshotManifestMetadata[] = [];

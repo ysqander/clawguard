@@ -117,11 +117,14 @@ export class VirusTotalHttpClient implements VirusTotalClient {
 
   async getFileVerdict(contentHash: string): Promise<ThreatIntelVerdict | null> {
     return this.lookupVerdict(`file:${contentHash}`, this.cachePolicy.fileTtlMs, async () => {
-      const response = await this.requestJson(`${this.baseUrl}/files/${encodeURIComponent(contentHash)}`, {
-        endpoint: subjectToEndpoint.file,
-        priority: "blocking",
-        subject: contentHash,
-      });
+      const response = await this.requestJson(
+        `${this.baseUrl}/files/${encodeURIComponent(contentHash)}`,
+        {
+          endpoint: subjectToEndpoint.file,
+          priority: "blocking",
+          subject: contentHash,
+        },
+      );
 
       return response ? buildLookupVerdict("file", contentHash, response) : null;
     });
@@ -146,11 +149,14 @@ export class VirusTotalHttpClient implements VirusTotalClient {
   }
 
   async getAnalysisStatus(analysisId: string): Promise<VirusTotalAnalysisStatus | null> {
-    const response = await this.requestJson(`${this.baseUrl}/analyses/${encodeURIComponent(analysisId)}`, {
-      endpoint: subjectToEndpoint.file,
-      priority: "background",
-      subject: analysisId,
-    });
+    const response = await this.requestJson(
+      `${this.baseUrl}/analyses/${encodeURIComponent(analysisId)}`,
+      {
+        endpoint: subjectToEndpoint.file,
+        priority: "background",
+        subject: analysisId,
+      },
+    );
 
     if (!response || !isRecord(response.data) || !isRecord(response.data.attributes)) {
       return null;
@@ -171,11 +177,14 @@ export class VirusTotalHttpClient implements VirusTotalClient {
   async getUrlVerdict(url: string): Promise<ThreatIntelVerdict | null> {
     return this.lookupVerdict(`url:${url}`, this.cachePolicy.urlTtlMs, async () => {
       const encodedUrlId = Buffer.from(url).toString("base64url");
-      const response = await this.requestJson(`${this.baseUrl}/urls/${encodeURIComponent(encodedUrlId)}`, {
-        endpoint: subjectToEndpoint.url,
-        priority: "background",
-        subject: url,
-      });
+      const response = await this.requestJson(
+        `${this.baseUrl}/urls/${encodeURIComponent(encodedUrlId)}`,
+        {
+          endpoint: subjectToEndpoint.url,
+          priority: "background",
+          subject: url,
+        },
+      );
 
       return response ? buildLookupVerdict("url", url, response) : null;
     });
@@ -183,11 +192,14 @@ export class VirusTotalHttpClient implements VirusTotalClient {
 
   async getDomainVerdict(domain: string): Promise<ThreatIntelVerdict | null> {
     return this.lookupVerdict(`domain:${domain}`, this.cachePolicy.domainTtlMs, async () => {
-      const response = await this.requestJson(`${this.baseUrl}/domains/${encodeURIComponent(domain)}`, {
-        endpoint: subjectToEndpoint.domain,
-        priority: "background",
-        subject: domain,
-      });
+      const response = await this.requestJson(
+        `${this.baseUrl}/domains/${encodeURIComponent(domain)}`,
+        {
+          endpoint: subjectToEndpoint.domain,
+          priority: "background",
+          subject: domain,
+        },
+      );
 
       return response ? buildLookupVerdict("domain", domain, response) : null;
     });
@@ -195,11 +207,14 @@ export class VirusTotalHttpClient implements VirusTotalClient {
 
   async searchIndicators(query: string): Promise<VirusTotalSearchResult | null> {
     return this.lookupVerdict(`search:${query}`, this.cachePolicy.searchTtlMs, async () => {
-      const response = await this.requestJson(`${this.baseUrl}/search?query=${encodeURIComponent(query)}`, {
-        endpoint: subjectToEndpoint.search,
-        priority: "background",
-        subject: query,
-      });
+      const response = await this.requestJson(
+        `${this.baseUrl}/search?query=${encodeURIComponent(query)}`,
+        {
+          endpoint: subjectToEndpoint.search,
+          priority: "background",
+          subject: query,
+        },
+      );
 
       if (!response || !Array.isArray(response.data)) {
         return null;
@@ -214,7 +229,11 @@ export class VirusTotalHttpClient implements VirusTotalClient {
     });
   }
 
-  private async lookupVerdict<T>(cacheKey: string, ttlMs: number, load: () => Promise<T | null>): Promise<T | null> {
+  private async lookupVerdict<T>(
+    cacheKey: string,
+    ttlMs: number,
+    load: () => Promise<T | null>,
+  ): Promise<T | null> {
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expiresAt > this.now()) {
       return cached.value as T;
@@ -244,12 +263,20 @@ export class VirusTotalHttpClient implements VirusTotalClient {
     const now = this.now();
     const windowStart = now - this.quotaPolicy.windowMs;
 
-    while (this.requestTimestamps.length > 0 && this.requestTimestamps[0] !== undefined && this.requestTimestamps[0] <= windowStart) {
+    while (
+      this.requestTimestamps.length > 0 &&
+      this.requestTimestamps[0] !== undefined &&
+      this.requestTimestamps[0] <= windowStart
+    ) {
       this.requestTimestamps.shift();
     }
 
     const maxRequests = Math.max(0, this.quotaPolicy.maxRequests);
-    const reservedBlockingRequests = clamp(this.quotaPolicy.reservedBlockingRequests, 0, maxRequests);
+    const reservedBlockingRequests = clamp(
+      this.quotaPolicy.reservedBlockingRequests,
+      0,
+      maxRequests,
+    );
     const limit = priority === "blocking" ? maxRequests : maxRequests - reservedBlockingRequests;
 
     if (this.requestTimestamps.length >= limit) {
@@ -317,7 +344,10 @@ export class VirusTotalHttpClient implements VirusTotalClient {
   }
 }
 
-function buildSearchVerdict(entry: Record<string, unknown>, fallbackSubject: string): ThreatIntelVerdict | null {
+function buildSearchVerdict(
+  entry: Record<string, unknown>,
+  fallbackSubject: string,
+): ThreatIntelVerdict | null {
   const subjectType = mapVirusTotalObjectType(asString(entry.type));
   if (!subjectType) {
     return null;
@@ -335,7 +365,10 @@ function buildLookupVerdict(
   return buildVerdict(subjectType, subject, extractLookupStats(payload), payload);
 }
 
-function buildAnalysisVerdict(subject: string, payload: Record<string, unknown>): ThreatIntelVerdict | null {
+function buildAnalysisVerdict(
+  subject: string,
+  payload: Record<string, unknown>,
+): ThreatIntelVerdict | null {
   return buildVerdict("file", subject, extractAnalysisStats(payload), payload);
 }
 
@@ -350,11 +383,7 @@ function buildVerdict(
   }
 
   const verdict = deriveVerdict(stats.malicious, stats.suspicious);
-  const total =
-    stats.malicious +
-    stats.suspicious +
-    stats.harmless +
-    stats.undetected;
+  const total = stats.malicious + stats.suspicious + stats.harmless + stats.undetected;
 
   const verdictPayload: ThreatIntelVerdict = {
     provider: "virustotal",
@@ -413,7 +442,10 @@ function extractSourceUrl(payload: Record<string, unknown>): string | undefined 
   return undefined;
 }
 
-function getNestedRecord(value: Record<string, unknown>, ...keys: string[]): Record<string, unknown> | null {
+function getNestedRecord(
+  value: Record<string, unknown>,
+  ...keys: string[]
+): Record<string, unknown> | null {
   let current: unknown = value;
 
   for (const key of keys) {
