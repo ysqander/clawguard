@@ -364,6 +364,18 @@ export class ClawGuardStorage implements StorageApi {
     return row ? this.getStaticReport(row.report_id) : undefined;
   }
 
+  public async getLatestStaticReportByContentHash(
+    contentHash: string,
+  ): Promise<StoredStaticReport | undefined> {
+    const row = this.db
+      .prepare(
+        "SELECT report_id FROM reports WHERE content_hash = ? ORDER BY generated_at DESC LIMIT 1",
+      )
+      .get(contentHash) as { report_id: string } | undefined;
+
+    return row ? this.getStaticReport(row.report_id) : undefined;
+  }
+
   public async writeArtifact(input: WriteArtifactInput): Promise<StoredArtifactRecord> {
     const preparedArtifact = await this.artifactStore.writeArtifact(input);
     return this.indexPreparedArtifact(preparedArtifact);

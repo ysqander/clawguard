@@ -21,6 +21,7 @@ export interface SynthesizedStaticReport {
   summary: ReportSummary;
   report: StaticScanReport;
   threatIntelVerdicts: ThreatIntelVerdict[];
+  clawHubMetadata?: Record<string, unknown>;
   decisionReason: string;
   plainLanguageSummary: string;
   plainLanguageReport: string;
@@ -35,10 +36,11 @@ export interface PersistSynthesizedStaticReportResult {
 }
 
 export function synthesizeStaticReport(input: StaticReportSynthesisInput): SynthesizedStaticReport {
-  assertScanAndReportMatch(input.scan, input.report);
+  assertScanAndReportConsistency(input.scan, input.report);
 
   const generatedAt = input.generatedAt ?? input.report.generatedAt;
   const threatIntelVerdicts = mergeThreatIntelVerdicts(input);
+  const clawHubMetadata = input.clawHubMetadata;
   const summary: ReportSummary = {
     reportId: input.report.reportId,
     scanId: input.scan.scanId,
@@ -51,12 +53,18 @@ export function synthesizeStaticReport(input: StaticReportSynthesisInput): Synth
 
   const decisionReason = buildDecisionReason(input.report, threatIntelVerdicts);
   const plainLanguageSummary = renderStaticSummary(input.report, threatIntelVerdicts);
-  const plainLanguageReport = renderStaticReport(input.report, threatIntelVerdicts, decisionReason);
+  const plainLanguageReport = renderStaticReport(
+    input.report,
+    threatIntelVerdicts,
+    decisionReason,
+    clawHubMetadata,
+  );
 
   return {
     summary,
     report: input.report,
     threatIntelVerdicts,
+    ...(clawHubMetadata ? { clawHubMetadata } : {}),
     decisionReason,
     plainLanguageSummary,
     plainLanguageReport,
@@ -67,7 +75,7 @@ export async function persistSynthesizedStaticReport(
   storage: StorageApi,
   synthesized: SynthesizedStaticReport,
 ): Promise<PersistSynthesizedStaticReportResult> {
-  const storedReport = await storage.persistStaticReport({
+  await storage.persistStaticReport({
     summary: synthesized.summary,
     report: synthesized.report,
   });
@@ -80,6 +88,7 @@ export async function persistSynthesizedStaticReport(
       summary: synthesized.summary,
       report: synthesized.report,
       threatIntelVerdicts: synthesized.threatIntelVerdicts,
+      ...(synthesized.clawHubMetadata ? { clawHubMetadata: synthesized.clawHubMetadata } : {}),
       decisionReason: synthesized.decisionReason,
     },
   });
@@ -91,6 +100,11 @@ export async function persistSynthesizedStaticReport(
     data: synthesized.plainLanguageReport,
     mimeType: "text/markdown",
   });
+
+  const storedReport = await storage.getStaticReport(synthesized.summary.reportId);
+  if (!storedReport) {
+    throw new Error(`Failed to read persisted report ${synthesized.summary.reportId}`);
+  }
 
   return {
     storedReport,
@@ -118,6 +132,7 @@ export function renderStaticReport(
   report: StaticScanReport,
   threatIntelVerdicts: ThreatIntelVerdict[] = [],
   decisionReason = buildDecisionReason(report, threatIntelVerdicts),
+  clawHubMetadata?: Record<string, unknown>,
 ): string {
   const lines: string[] = [
     `# ClawGuard static report: ${report.snapshot.slug}`,
@@ -142,6 +157,10 @@ export function renderStaticReport(
     });
   }
 
+  if (clawHubMetadata) {
+    lines.push("", "## ClawHub marketplace context", ...renderClawHubMarketplaceContext(report, clawHubMetadata));
+  }
+
   lines.push("", "## Threat-intelligence enrichment");
 
   if (threatIntelVerdicts.length === 0) {
@@ -162,11 +181,7 @@ export function renderStaticReport(
   return lines.join("\n");
 }
 
-function assertScanAndReportMatch(scan: ScanRecord, report: StaticScanReport): void {
-  if (scan.scanId !== report.reportId) {
-    throw new Error(`scan.scanId (${scan.scanId}) must match report.reportId (${report.reportId})`);
-  }
-
+function assertScanAndReportConsistency(scan: ScanRecord, report: StaticScanReport): void {
   if (scan.slug !== report.snapshot.slug) {
     throw new Error(`scan.slug (${scan.slug}) must match report.snapshot.slug (${report.snapshot.slug})`);
   }
@@ -189,6 +204,34 @@ function mergeThreatIntelVerdicts(input: StaticReportSynthesisInput): ThreatInte
   }
 
   return [...unique.values()];
+}
+
+function renderClawHubMarketplaceContext(
+  report: StaticScanReport,
+  clawHubMetadata: Record<string, unknown>,
+): string[] {
+  const metadataSlug = readMetadataString(clawHubMetadata, "slug");
+  const name =
+    readMetadataString(clawHubMetadata, "displayName") ?? readMetadataString(clawHubMetadata, "name");
+  const summary =
+    readMetadataString(clawHubMetadata, "summary") ?? readMetadataString(clawHubMetadata, "description");
+  const hasRecognizedMetadataFields =
+    metadataSlug !== undefined || name !== undefined || summary !== undefined;
+  const lines = [`- Slug: ${metadataSlug ?? report.snapshot.slug}`];
+
+  if (name) {
+    lines.push(`- Name: ${name}`);
+  }
+
+  if (summary) {
+    lines.push(`- Summary: ${summary}`);
+  }
+
+  if (Object.keys(clawHubMetadata).length > 0 && !hasRecognizedMetadataFields) {
+    lines.push("Raw ClawHub metadata was captured in the JSON artifact for later inspection.");
+  }
+
+  return lines;
 }
 
 function buildDecisionReason(report: StaticScanReport, threatIntelVerdicts: ThreatIntelVerdict[]): string {
@@ -215,4 +258,9 @@ function buildDecisionReason(report: StaticScanReport, threatIntelVerdicts: Thre
 
 function uppercaseVerdict(verdict: VerdictLevel): string {
   return verdict.toUpperCase();
+}
+
+function readMetadataString(metadata: Record<string, unknown>, key: string): string | undefined {
+  const value = metadata[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

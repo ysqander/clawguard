@@ -6,7 +6,7 @@ import type {
   StaticScanReport,
   ThreatIntelVerdict,
 } from "@clawguard/contracts";
-import type { StorageApi } from "@clawguard/storage";
+import type { StorageApi, StoredArtifactRecord } from "@clawguard/storage";
 
 import {
   persistSynthesizedStaticReport,
@@ -18,6 +18,7 @@ function buildFixture(): {
   scan: ScanRecord;
   report: StaticScanReport;
   verdicts: ThreatIntelVerdict[];
+  clawHubMetadata: Record<string, unknown>;
 } {
   const scan: ScanRecord = {
     scanId: "scan-001",
@@ -29,7 +30,7 @@ function buildFixture(): {
   };
 
   const report: StaticScanReport = {
-    reportId: "scan-001",
+    reportId: "report-calendar-helper-sha256:fixtu",
     snapshot: {
       slug: "calendar-helper",
       path: "/tmp/calendar-helper",
@@ -74,43 +75,90 @@ function buildFixture(): {
     },
   ];
 
-  return { scan, report, verdicts };
+  const clawHubMetadata = {
+    slug: "calendar-helper",
+    displayName: "Calendar Helper",
+    summary: "Marketplace summary for the calendar helper skill.",
+    installs: 42,
+  };
+
+  return { scan, report, verdicts, clawHubMetadata };
 }
 
-test("synthesizeStaticReport merges local findings with enrichment but keeps local recommendation authoritative", () => {
-  const { scan, report, verdicts } = buildFixture();
+test("synthesizeStaticReport accepts distinct scan and report ids and preserves ClawHub metadata", () => {
+  const { scan, report, verdicts, clawHubMetadata } = buildFixture();
+  const [clawHubVerdict, virusTotalVerdict] = verdicts;
+  assert.ok(clawHubVerdict);
+  assert.ok(virusTotalVerdict);
 
   const synthesized = synthesizeStaticReport({
     scan,
     report,
-    clawHubVerdict: verdicts[0]!,
-    virusTotalVerdict: verdicts[1]!,
+    clawHubMetadata,
+    clawHubVerdict,
+    virusTotalVerdict,
   });
 
+  assert.equal(synthesized.summary.reportId, report.reportId);
+  assert.equal(synthesized.summary.scanId, scan.scanId);
   assert.equal(synthesized.summary.verdict, "block");
   assert.equal(synthesized.summary.findingCount, 1);
   assert.equal(synthesized.threatIntelVerdicts.length, 2);
+  assert.deepEqual(synthesized.clawHubMetadata, clawHubMetadata);
   assert.match(synthesized.decisionReason, /supporting context only/);
   assert.match(synthesized.plainLanguageReport, /Threat-intelligence enrichment/);
 });
 
-test("renderStaticReport includes explicit enrichment caveat", () => {
-  const { report, verdicts } = buildFixture();
-  const rendered = renderStaticReport(report, verdicts);
+test("synthesizeStaticReport rejects mismatched slugs", () => {
+  const { scan, report } = buildFixture();
+
+  assert.throws(
+    () =>
+      synthesizeStaticReport({
+        scan: { ...scan, slug: "other-skill" },
+        report,
+      }),
+    /scan\.slug \(other-skill\) must match report\.snapshot\.slug \(calendar-helper\)/,
+  );
+});
+
+test("synthesizeStaticReport rejects mismatched content hashes", () => {
+  const { scan, report } = buildFixture();
+
+  assert.throws(
+    () =>
+      synthesizeStaticReport({
+        scan: { ...scan, contentHash: "sha256:other" },
+        report,
+      }),
+    /scan\.contentHash must match report\.snapshot\.contentHash/,
+  );
+});
+
+test("renderStaticReport includes ClawHub marketplace context and explicit enrichment caveat", () => {
+  const { report, verdicts, clawHubMetadata } = buildFixture();
+  const rendered = renderStaticReport(report, verdicts, undefined, clawHubMetadata);
 
   assert.match(rendered, /Recommendation: \*\*BLOCK\*\*/);
+  assert.match(rendered, /## ClawHub marketplace context/);
+  assert.match(rendered, /- Slug: calendar-helper/);
+  assert.match(rendered, /- Name: Calendar Helper/);
+  assert.match(rendered, /- Summary: Marketplace summary for the calendar helper skill\./);
   assert.match(rendered, /Enrichment signals provide additional context and do not replace local static findings\./);
 });
 
-test("persistSynthesizedStaticReport stores summary and report artifacts", async () => {
-  const { scan, report, verdicts } = buildFixture();
+test("persistSynthesizedStaticReport stores artifacts, persists ClawHub metadata, and returns refreshed storage state", async () => {
+  const { scan, report, verdicts, clawHubMetadata } = buildFixture();
   const synthesized = synthesizeStaticReport({
     scan,
     report,
+    clawHubMetadata,
     threatIntelVerdicts: verdicts,
   });
 
   const storageCalls: string[] = [];
+  let capturedJsonArtifactValue: unknown;
+  const persistedArtifacts: StoredArtifactRecord[] = [];
   const storage = {
     paths: { stateDbPath: "state.db", artifactsRoot: "artifacts" },
     schemaVersion: 1,
@@ -124,9 +172,19 @@ test("persistSynthesizedStaticReport stores summary and report artifacts", async
       storageCalls.push("persistStaticReport");
       return { summary, report: persistedReport, artifacts: [] };
     },
-    writeJsonArtifact: async () => {
-      storageCalls.push("writeJsonArtifact");
+    getStaticReport: async (reportId: string) => {
+      storageCalls.push("getStaticReport");
+      assert.equal(reportId, report.reportId);
       return {
+        summary: synthesized.summary,
+        report,
+        artifacts: persistedArtifacts,
+      };
+    },
+    writeJsonArtifact: async ({ value }: { value: unknown }) => {
+      storageCalls.push("writeJsonArtifact");
+      capturedJsonArtifactValue = value;
+      const artifact: StoredArtifactRecord = {
         artifactId: "artifact-json",
         scanId: scan.scanId,
         type: "report-json",
@@ -137,10 +195,12 @@ test("persistSynthesizedStaticReport stores summary and report artifacts", async
         sizeBytes: 10,
         createdAt: "2026-03-12T00:01:00.000Z",
       };
+      persistedArtifacts.push(artifact);
+      return artifact;
     },
     writeArtifact: async () => {
       storageCalls.push("writeArtifact");
-      return {
+      const artifact: StoredArtifactRecord = {
         artifactId: "artifact-md",
         scanId: scan.scanId,
         type: "report-markdown",
@@ -151,13 +211,28 @@ test("persistSynthesizedStaticReport stores summary and report artifacts", async
         sizeBytes: 20,
         createdAt: "2026-03-12T00:01:00.000Z",
       };
+      persistedArtifacts.push(artifact);
+      return artifact;
     },
   } as unknown as StorageApi;
 
   const persisted = await persistSynthesizedStaticReport(storage, synthesized);
 
   assert.equal(persisted.storedReport.summary.slug, "calendar-helper");
+  assert.equal(persisted.storedReport.artifacts.length, 2);
   assert.equal(persisted.artifacts.reportJson.type, "report-json");
   assert.equal(persisted.artifacts.summaryMarkdown.type, "report-markdown");
-  assert.deepEqual(storageCalls, ["persistStaticReport", "writeJsonArtifact", "writeArtifact"]);
+  assert.deepEqual(capturedJsonArtifactValue, {
+    summary: synthesized.summary,
+    report: synthesized.report,
+    threatIntelVerdicts: synthesized.threatIntelVerdicts,
+    clawHubMetadata,
+    decisionReason: synthesized.decisionReason,
+  });
+  assert.deepEqual(storageCalls, [
+    "persistStaticReport",
+    "writeJsonArtifact",
+    "writeArtifact",
+    "getStaticReport",
+  ]);
 });

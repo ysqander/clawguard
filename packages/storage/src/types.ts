@@ -103,6 +103,7 @@ export interface StorageApi {
   persistStaticReport(input: PersistStaticReportInput): Promise<StoredStaticReport>;
   getStaticReport(reportId: string): Promise<StoredStaticReport | undefined>;
   getLatestStaticReportBySlug(slug: string): Promise<StoredStaticReport | undefined>;
+  getLatestStaticReportByContentHash(contentHash: string): Promise<StoredStaticReport | undefined>;
   writeArtifact(input: WriteArtifactInput): Promise<StoredArtifactRecord>;
   writeJsonArtifact(input: WriteJsonArtifactInput): Promise<StoredArtifactRecord>;
   upsertDecision(input: UpsertDecisionInput): Promise<DecisionRecord>;
