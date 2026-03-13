@@ -29,6 +29,9 @@ importers:
       '@clawguard/scanner':
         specifier: workspace:*
         version: link:../../packages/scanner
+      '@clawguard/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
 
   apps/daemon:
     dependencies:
