@@ -4,12 +4,12 @@ This plan translates the product spec in `docs/clawguard-spec-v2.docx` into a de
 
 ## Current status snapshot
 
-As of 2026-03-12, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, and skill snapshot production.
+As of 2026-03-12, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, and the ClawHub and VirusTotal client foundations.
 
-The main post-foundation work now starts with:
+The main remaining Milestone A work now centers on:
 
-- static scanner and scoring on top of the new `SkillSnapshot` pipeline
-- threat-intelligence integrations, report synthesis, and daemon orchestration needed for the rest of Milestone A
+- static report synthesis that merges scanner output with threat-intelligence enrichments and persists operator-facing results
+- daemon orchestration, IPC, and CLI flows needed to turn the implemented packages into the end-to-end static interception path
 
 ## Confirmed architecture decisions
 
