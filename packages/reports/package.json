@@ -14,9 +14,14 @@
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
-    "clean": "tsc -b --clean"
+    "clean": "tsc -b --clean",
+    "test": "node --test --import tsx ./src/**/*.test.ts"
   },
   "dependencies": {
-    "@clawguard/contracts": "workspace:*"
+    "@clawguard/contracts": "workspace:*",
+    "@clawguard/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
   }
 }
