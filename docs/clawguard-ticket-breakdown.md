@@ -10,13 +10,12 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-13, the repo has landed the main code and documentation for `CG-001` through `CG-012`.
+As of 2026-03-13, the repo has landed the main code and documentation for `CG-001` through `CG-017`.
 
 `CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness, but full detonation execution benchmarking remains blocked on `CG-013` through `CG-016`.
 
-The next unfinished Milestone A tickets now start with:
+The next unfinished Milestone A ticket now starts with:
 
-- `CG-017`: daemon job orchestration and IPC
 - `CG-018`: CLI commands and output formatting
 
 `CG-020` remains partially complete until detonation execution benchmarking can land on top of `CG-013` through `CG-016`, but its current fixture corpus and static benchmarking outputs are sufficient to support `CG-017` and `CG-018` implementation and validation.
@@ -343,6 +342,7 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-006`, `CG-007`, `CG-012`
+Status: `Complete`
 
 Scope:
 

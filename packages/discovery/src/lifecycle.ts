@@ -2,7 +2,7 @@ import { rm, rename } from "node:fs/promises";
 import path from "node:path";
 
 import { defaultClawGuardConfig, type PathsConfig } from "@clawguard/contracts";
-import type { DecisionRecord } from "@clawguard/contracts";
+import type { DecisionRecord, VerdictLevel } from "@clawguard/contracts";
 import type { QuarantineRecord, StorageApi } from "@clawguard/storage";
 
 export type LifecycleResolution =
@@ -37,6 +37,10 @@ export interface QuarantineSkillInput extends ResolveSkillLifecycleInput {
   reason?: string;
 }
 
+export interface ApplyPostScanDispositionInput extends ResolveSkillLifecycleInput {
+  recommendation: VerdictLevel;
+}
+
 export interface AllowHashInput {
   contentHash: string;
   reason?: string;
@@ -56,6 +60,31 @@ export interface DeleteSkillInput {
   quarantineId: string;
   reason?: string;
 }
+
+export interface ApplyOperatorAllowInput {
+  skillSlug: string;
+  contentHash: string;
+  reason?: string;
+}
+
+export interface ApplyOperatorBlockInput extends ApplyOperatorAllowInput {
+  skillPath: string;
+}
+
+export type PostScanLifecycleResolution =
+  | {
+      status: "allowed";
+      decision?: DecisionRecord;
+    }
+  | {
+      status: "blocked";
+      decision: DecisionRecord;
+      blockedPath: string;
+    }
+  | {
+      status: "quarantined";
+      quarantine: QuarantineRecord;
+    };
 
 const DEFAULT_ALLOW_REASON = "Allowed by operator";
 const DEFAULT_BLOCK_REASON = "Blocked by operator";
@@ -118,6 +147,35 @@ export class SkillLifecycleManager {
     });
   }
 
+  public async applyPostScanDisposition(
+    input: ApplyPostScanDispositionInput,
+  ): Promise<PostScanLifecycleResolution> {
+    const decision = await this.storage.getDecision(input.contentHash);
+
+    if (decision?.decision === "allow") {
+      return { status: "allowed", decision };
+    }
+
+    if (decision?.decision === "block") {
+      await rm(input.skillPath, { recursive: true, force: true });
+      return {
+        status: "blocked",
+        decision,
+        blockedPath: input.skillPath,
+      };
+    }
+
+    if (input.recommendation === "allow") {
+      return { status: "allowed" };
+    }
+
+    const quarantine = await this.quarantineSkill({
+      ...input,
+      reason: "Auto-quarantined pending operator review",
+    });
+    return { status: "quarantined", quarantine };
+  }
+
   public async allowHash(input: AllowHashInput): Promise<DecisionRecord> {
     return this.storage.upsertDecision({
       contentHash: input.contentHash,
@@ -125,6 +183,47 @@ export class SkillLifecycleManager {
       reason: input.reason ?? DEFAULT_ALLOW_REASON,
       createdAt: this.now(),
     });
+  }
+
+  public async applyOperatorAllow(input: ApplyOperatorAllowInput): Promise<DecisionRecord> {
+    const record = await this.findMatchingQuarantineRecord(input.skillSlug, input.contentHash);
+
+    if (record?.state === "active") {
+      await this.restoreSkill({
+        quarantineId: record.quarantineId,
+        ...(input.reason ? { reason: input.reason } : {}),
+      });
+    } else {
+      await this.allowHash(input);
+    }
+
+    const decision = await this.storage.getDecision(input.contentHash);
+    if (!decision) {
+      throw new Error(`Failed to read allow decision for ${input.contentHash}`);
+    }
+
+    return decision;
+  }
+
+  public async applyOperatorBlock(input: ApplyOperatorBlockInput): Promise<DecisionRecord> {
+    const record = await this.findMatchingQuarantineRecord(input.skillSlug, input.contentHash);
+
+    if (record) {
+      await this.deleteSkill({
+        quarantineId: record.quarantineId,
+        ...(input.reason ? { reason: input.reason } : {}),
+      });
+    } else {
+      await rm(input.skillPath, { recursive: true, force: true });
+      await this.blockHash(input);
+    }
+
+    const decision = await this.storage.getDecision(input.contentHash);
+    if (!decision) {
+      throw new Error(`Failed to read block decision for ${input.contentHash}`);
+    }
+
+    return decision;
   }
 
   public async blockHash(input: BlockHashInput): Promise<DecisionRecord> {
@@ -184,6 +283,19 @@ export class SkillLifecycleManager {
     });
 
     return updated;
+  }
+
+  private async findMatchingQuarantineRecord(
+    skillSlug: string,
+    contentHash: string,
+  ): Promise<QuarantineRecord | undefined> {
+    const records = await this.storage.listQuarantineRecords({ contentHash });
+    const matching = records.filter(
+      (record) => record.skillSlug === skillSlug && record.state !== "deleted",
+    );
+
+    return matching.find((record) => record.state === "active") ??
+      matching.find((record) => record.state === "restored");
   }
 }
 

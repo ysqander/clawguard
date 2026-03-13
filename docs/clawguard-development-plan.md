@@ -4,16 +4,15 @@ This plan translates the product spec in `docs/clawguard-spec-v2.docx` into a de
 
 ## Current status snapshot
 
-As of 2026-03-13, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, static report synthesis that merges local findings with enrichment signals (`CG-012`), and the first reusable fixture corpus plus a gated static benchmark harness and initial detonation preflight harness (`CG-020`, partial until full detonation execution benchmarking is unblocked).
+As of 2026-03-13, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, static report synthesis that merges local findings with enrichment signals (`CG-012`), daemon job orchestration plus Unix-socket IPC (`CG-017`), and the first reusable fixture corpus plus a gated static benchmark harness and initial detonation preflight harness (`CG-020`, partial until full detonation execution benchmarking is unblocked).
 
 The main remaining Milestone A work now centers on:
 
-- daemon orchestration, IPC, and CLI flows needed to turn the implemented packages into the end-to-end static interception path
+- CLI command coverage and operator-focused output formatting needed to complete the end-to-end static interception path
 
 Recommended immediate execution focus:
 
-- `CG-017` as the Milestone A critical-path next step.
-- `CG-018` in parallel on mocked IPC responses and formatting contracts so CLI UX is ready when `CG-017` stabilizes.
+- `CG-018` as the Milestone A critical-path next step.
 - Optional parallel prep for Milestone B by starting `CG-013` runtime-provider scaffolding in isolation from daemon/CLI wiring.
 
 ## Confirmed architecture decisions

@@ -1,3 +1,6 @@
+import os from "node:os";
+import path from "node:path";
+
 import {
   createValidator,
   parseArray,
@@ -132,6 +135,12 @@ export interface DaemonErrorResponse {
 }
 
 export type DaemonResponseEnvelope = DaemonSuccessResponse | DaemonErrorResponse;
+
+const DEFAULT_DAEMON_SOCKET_PATH = path.join(os.tmpdir(), "clawguard-daemon.sock");
+
+export function resolveDaemonSocketPath(): string {
+  return process.env.CLAWGUARD_DAEMON_SOCKET ?? DEFAULT_DAEMON_SOCKET_PATH;
+}
 
 function parseDaemonRequestPayload(input: unknown, path: string): DaemonRequestPayload {
   return parseObject(input, path, (record) => {
