@@ -19,7 +19,7 @@ The next unfinished Milestone A tickets now start with:
 - `CG-017`: daemon job orchestration and IPC
 - `CG-018`: CLI commands and output formatting
 
-`CG-020` remains partially complete until detonation execution benchmarking can land on top of `CG-013` through `CG-016`.
+`CG-020` remains partially complete until detonation execution benchmarking can land on top of `CG-013` through `CG-016`, but its current fixture corpus and static benchmarking outputs are sufficient to support `CG-017` and `CG-018` implementation and validation.
 
 ## Epic A: Monorepo Foundation
 
@@ -462,12 +462,13 @@ Start with:
 
 Current recommended parallel work:
 
-- `CG-012`
-- `CG-020`
+- `CG-017` (daemon orchestration + IPC)
+- `CG-018` (CLI UX and formatting against mocked/stubbed IPC payloads while `CG-017` lands)
+- `CG-013` (optional Milestone B runtime-provider scaffolding if staffing allows)
 
 Remaining Static MVP critical path:
 
-- `CG-012` -> `CG-017` -> `CG-018`
+- `CG-017` -> `CG-018`
 
 Behavioral MVP critical path:
 
