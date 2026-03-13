@@ -9,9 +9,17 @@ import {
 } from "@clawguard/fixtures";
 import { createPlatformAdapter, type ContainerRuntimeDetector } from "@clawguard/platform";
 
-export type DetonationRuntime = "podman" | "docker";
-
-export const defaultDetonationRuntime: DetonationRuntime = "podman";
+export {
+  createDetonationRuntimeProvider,
+  defaultDetonationRuntime,
+  defaultSandboxImageTag,
+  type CreateDetonationRuntimeProviderOptions,
+  type DetonationRuntimeProvider,
+  type EnsureSandboxImageOptions,
+  type EnsureSandboxImageResult,
+  type RuntimeCommandExecutor,
+  type RuntimeCommandResult,
+} from "./runtime-provider.js";
 
 const DEFAULT_TIMEOUT_SECONDS = 90;
 const DETONATION_BENCHMARK_PROMPTS = [
@@ -74,7 +82,7 @@ export async function runDetonationPreflightBenchmark(
   }
 
   const runtimeStart = performance.now();
-  const runtime = await runtimeDetector.getPreferredRuntime(defaultDetonationRuntime);
+  const runtime = await runtimeDetector.getPreferredRuntime("podman");
   const runtimeDetectionMs = performance.now() - runtimeStart;
 
   const rows: DetonationPreflightBenchmarkRow[] = fixtures.map((fixture) => {

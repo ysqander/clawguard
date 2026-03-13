@@ -4,11 +4,15 @@ This plan translates the product spec in `docs/clawguard-spec-v2.docx` into a de
 
 ## Current status snapshot
 
-As of 2026-03-13, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, static report synthesis that merges local findings with enrichment signals, and the first reusable fixture corpus plus a gated static benchmark harness and initial detonation preflight harness.
+As of 2026-03-13, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, static report synthesis that merges local findings with enrichment signals, the first reusable fixture corpus plus a gated static benchmark harness and initial detonation preflight harness, and the first Podman-first runtime provider with Docker-compatible sandbox-image preparation.
 
 The main remaining Milestone A work now centers on:
 
 - daemon orchestration, IPC, and CLI flows needed to turn the implemented packages into the end-to-end static interception path
+
+The main remaining Milestone B detonation work now centers on:
+
+- dummy OpenClaw detonation environment setup, staged-download prompt execution, and telemetry capture on top of the runtime provider foundation.
 
 ## Confirmed architecture decisions
 

@@ -10,16 +10,17 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-13, the repo has landed the main code and documentation for `CG-001` through `CG-012`.
+As of 2026-03-13, the repo has landed the main code and documentation for `CG-001` through `CG-013`.
 
-`CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness, but full detonation execution benchmarking remains blocked on `CG-013` through `CG-016`.
+`CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness, but full detonation execution benchmarking remains blocked on `CG-014` through `CG-016`.
 
-The next unfinished Milestone A tickets now start with:
+The next unfinished Milestone B tickets now start with:
 
-- `CG-017`: daemon job orchestration and IPC
-- `CG-018`: CLI commands and output formatting
+- `CG-014`: dummy OpenClaw detonation environment and honeypots
+- `CG-015`: staged-download prompt runner
+- `CG-016`: telemetry capture and VT enrichment
 
-`CG-020` remains partially complete until detonation execution benchmarking can land on top of `CG-013` through `CG-016`.
+`CG-020` remains partially complete until detonation execution benchmarking can land on top of `CG-014` through `CG-016`.
 
 ## Epic A: Monorepo Foundation
 
@@ -269,6 +270,7 @@ Acceptance criteria:
 Priority: `P1`
 Milestone: `B`
 Depends on: `CG-002`, `CG-004`
+Status: `Complete`
 
 Scope:
 
