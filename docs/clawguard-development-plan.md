@@ -153,7 +153,7 @@ Scope:
 
 Current status:
 
-- Monorepo package boundaries, builds, typechecks, tests, lint/format tooling, CI, and ADRs are in place.
+- Monorepo package boundaries, builds, typechecks, tests, lint/format tooling, and ADRs are in place.
 
 Outputs:
 
@@ -308,7 +308,7 @@ Scope:
 Outputs:
 
 - Shared fixture corpus.
-- Benchmark and regression gates in CI.
+- Benchmark and regression gates in local validation workflows.
 - Launch-ready docs with honest security caveats.
 
 Dependencies:

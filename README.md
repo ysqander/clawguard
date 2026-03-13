@@ -35,7 +35,7 @@ Run the observational static scanner benchmark against the shared fixture corpus
 pnpm bench:static
 ```
 
-Run the gated CI variant, which exits nonzero if any fixture exceeds the default `p95 <= 2000ms` budget:
+Run the gated variant, which exits nonzero if any fixture exceeds the default `p95 <= 2000ms` budget:
 
 ```bash
 pnpm bench:static:ci
@@ -47,7 +47,7 @@ Override iterations for local tuning:
 CLAWGUARD_BENCH_ITERATIONS=250 pnpm bench:static
 ```
 
-Override the gated budget in CI or local enforcement runs:
+Override the gated budget in local enforcement runs:
 
 ```bash
 CLAWGUARD_BENCH_STATIC_P95_BUDGET_MS=1500 pnpm bench:static:ci

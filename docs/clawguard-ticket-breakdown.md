@@ -24,7 +24,7 @@ The next unfinished Milestone A tickets now start with:
 
 ## Epic A: Monorepo Foundation
 
-### CG-001 Initialize the monorepo and CI
+### CG-001 Initialize the monorepo and validation workflow
 
 Priority: `P0`
 Milestone: `A`
@@ -35,13 +35,13 @@ Scope:
 
 - Create `apps/` and `packages/` workspace layout.
 - Set up TypeScript project references, linting, formatting, tests, and publishable package builds.
-- Add CI for install, build, lint, and test.
+- Add a shared validation workflow for install, build, lint, and test.
 
 Acceptance criteria:
 
 - The repo builds from a clean checkout.
 - `apps/daemon` and `apps/cli` can import shared packages.
-- CI runs on every push with green install, build, typecheck, and test checks.
+- Local validation commands cover install, build, typecheck, lint, and test checks.
 - Lint and format commands are wired into the workspace and documented.
 
 ### CG-002 Define shared contracts and configuration schema
@@ -409,7 +409,7 @@ Scope:
 Acceptance criteria:
 
 - Fixtures are reusable across unit, integration, and end-to-end tests.
-- Static benchmark output is automated in CI or a gated local workflow.
+- Static benchmark output is automated in a gated local workflow.
 - Fixture coverage includes high-quality benign skills to track false positives.
 
 Note:
