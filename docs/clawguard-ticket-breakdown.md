@@ -10,11 +10,10 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-12, the repo has landed the main code and documentation for `CG-001` through `CG-011`.
+As of 2026-03-12, the repo has landed the main code and documentation for `CG-001` through `CG-012`.
 
 The next unfinished Milestone A tickets now start with:
 
-- `CG-012`: static report synthesis
 - `CG-017`: daemon job orchestration and IPC
 - `CG-018`: CLI commands and output formatting
 
@@ -245,6 +244,7 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-003`, `CG-009`, `CG-010`, `CG-011`
+Status: `Complete`
 
 Scope:
 
