@@ -109,6 +109,9 @@ importers:
       '@clawguard/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@clawguard/fixtures':
+        specifier: workspace:*
+        version: link:../fixtures
       '@clawguard/integrations':
         specifier: workspace:*
         version: link:../integrations

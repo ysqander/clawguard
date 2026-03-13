@@ -15,10 +15,12 @@
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
     "clean": "tsc -b --clean",
-    "test": "node --test \"dist/**/*.test.js\""
+    "test": "node --test \"dist/**/*.test.js\"",
+    "bench:static": "node dist/benchmark-static.js"
   },
   "dependencies": {
     "@clawguard/contracts": "workspace:*",
-    "@clawguard/integrations": "workspace:*"
+    "@clawguard/integrations": "workspace:*",
+    "@clawguard/fixtures": "workspace:*"
   }
 }

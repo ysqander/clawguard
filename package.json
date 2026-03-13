@@ -16,7 +16,8 @@
     "test": "pnpm -r --if-present --filter './packages/**' --filter './apps/**' run test",
     "clean": "pnpm -r --filter './packages/**' --filter './apps/**' run clean",
     "dev:cli": "pnpm --filter @clawguard/cli run dev",
-    "dev:daemon": "pnpm --filter @clawguard/daemon run dev"
+    "dev:daemon": "pnpm --filter @clawguard/daemon run dev",
+    "bench:static": "pnpm --filter @clawguard/scanner run bench:static"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",

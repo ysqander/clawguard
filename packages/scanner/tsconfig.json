@@ -4,6 +4,18 @@
     "rootDir": "./src",
     "outDir": "./dist"
   },
-  "include": ["src/**/*.ts"],
-  "references": [{ "path": "../contracts" }, { "path": "../integrations" }]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../contracts"
+    },
+    {
+      "path": "../integrations"
+    },
+    {
+      "path": "../fixtures"
+    }
+  ]
 }
