@@ -23,3 +23,17 @@ test("loadFixtureSnapshot produces deterministic inventory with SKILL.md", () =>
   assert.ok(snapshot.fileInventory.includes("SKILL.md"));
   assert.ok(snapshot.fileInventory.includes("scripts/install.sh"));
 });
+
+test("detonation-target benchmark selection is explicit and non-empty", () => {
+  const fixtures = listSkillFixtures({ benchmarkTag: "detonation-target" });
+
+  assert.deepEqual(
+    fixtures.map((fixture) => fixture.id),
+    [
+      "benign-calendar-helper",
+      "malicious-staged-download",
+      "malicious-memory-poisoning",
+      "malicious-exfiltration",
+    ],
+  );
+});

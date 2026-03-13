@@ -41,6 +41,9 @@ jobs:
       - name: Run tests
         run: pnpm test
 
+      - name: Run gated static benchmark
+        run: pnpm bench:static:ci
+
       - name: Smoke test CLI entrypoint
         run: node apps/cli/dist/index.js
 

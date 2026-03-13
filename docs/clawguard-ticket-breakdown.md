@@ -10,13 +10,17 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-13, the repo has landed the main code and documentation for `CG-001` through `CG-011` and `CG-020`.
+As of 2026-03-13, the repo has landed the main code and documentation for `CG-001` through `CG-011`.
+
+`CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness, but full detonation execution benchmarking remains blocked on `CG-013` through `CG-016`.
 
 The next unfinished Milestone A tickets now start with:
 
 - `CG-012`: static report synthesis
 - `CG-017`: daemon job orchestration and IPC
 - `CG-018`: CLI commands and output formatting
+
+`CG-020` remains partially complete until detonation execution benchmarking can land on top of `CG-013` through `CG-016`.
 
 ## Epic A: Monorepo Foundation
 
@@ -395,7 +399,6 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-001`
-Status: `Complete`
 
 Scope:
 
@@ -408,6 +411,10 @@ Acceptance criteria:
 - Fixtures are reusable across unit, integration, and end-to-end tests.
 - Static benchmark output is automated in CI or a gated local workflow.
 - Fixture coverage includes high-quality benign skills to track false positives.
+
+Note:
+
+- Full detonation execution benchmarking remains blocked on `CG-013` through `CG-016`; the current repo only includes a detonation runtime-readiness preflight harness.
 
 ### CG-021 Implement end-to-end regression and security validation
 

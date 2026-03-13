@@ -8,16 +8,23 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
       "default": "./dist/index.js"
     }
   },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
-    "clean": "tsc -b --clean"
+    "clean": "tsc -b --clean",
+    "test": "node --test \"dist/**/*.test.js\"",
+    "bench:detonation:preflight": "node --conditions=source --import tsx ./src/benchmark-detonation-preflight.ts"
   },
   "dependencies": {
     "@clawguard/contracts": "workspace:*",
+    "@clawguard/fixtures": "workspace:*",
     "@clawguard/platform": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
   }
 }
