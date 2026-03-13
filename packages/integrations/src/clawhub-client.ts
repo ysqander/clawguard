@@ -61,7 +61,9 @@ export class HttpClawHubClient {
       return null;
     }
 
-    const response = await this.request(`/api/v1/skills/${encodeURIComponent(slug)}/file?path=SKILL.md`);
+    const response = await this.request(
+      `/api/v1/skills/${encodeURIComponent(slug)}/file?path=SKILL.md`,
+    );
     if (response.status === 404) {
       return null;
     }
@@ -77,7 +79,11 @@ export class HttpClawHubClient {
 
     const response = await this.requestJson(`/api/v1/skills?sort=${encodeURIComponent(sort)}`);
     const payload = await response.json();
-    const items = Array.isArray(payload) ? payload : isRecord(payload) && Array.isArray(payload.items) ? payload.items : [];
+    const items = Array.isArray(payload)
+      ? payload
+      : isRecord(payload) && Array.isArray(payload.items)
+        ? payload.items
+        : [];
 
     const entries: ClawHubSkillListEntry[] = [];
     for (const item of items) {
@@ -128,7 +134,11 @@ export class HttpClawHubClient {
       return response;
     }
 
-    throw new IntegrationHttpError(`ClawHub request failed: ${response.status} ${url}`, response.status, url);
+    throw new IntegrationHttpError(
+      `ClawHub request failed: ${response.status} ${url}`,
+      response.status,
+      url,
+    );
   }
 
   private resolveVerdict(
@@ -154,7 +164,9 @@ export class HttpClawHubClient {
       verdict,
       summary:
         asString(providerRecord?.summary) ??
-        (verdict === "unknown" ? "No provider verdict available." : `Provider verdict: ${verdict}.`),
+        (verdict === "unknown"
+          ? "No provider verdict available."
+          : `Provider verdict: ${verdict}.`),
       ...(maliciousDetections !== undefined ? { maliciousDetections } : {}),
       ...(suspiciousDetections !== undefined ? { suspiciousDetections } : {}),
       ...(harmlessDetections !== undefined ? { harmlessDetections } : {}),
@@ -176,7 +188,9 @@ export class HttpClawHubClient {
 
     if (provider === "clawhub") {
       const fallback = coerceVerdictLevel(metadata.verdict);
-      return fallback ? { verdict: fallback, summary: "ClawHub verdict extracted from skill metadata." } : undefined;
+      return fallback
+        ? { verdict: fallback, summary: "ClawHub verdict extracted from skill metadata." }
+        : undefined;
     }
 
     const vtVerdict = coerceVerdictLevel(metadata.virusTotalVerdict);

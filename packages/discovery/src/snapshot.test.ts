@@ -1,14 +1,6 @@
 import assert from "node:assert/strict";
 import { constants } from "node:fs";
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  readlink,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readlink, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -44,7 +36,10 @@ test("buildSkillSnapshot produces a deterministic snapshot with discovery-derive
 
   const input = baseInput(sandbox.root);
   await mkdir(path.join(input.skillPath, "scripts"), { recursive: true });
-  await writeFile(path.join(input.skillPath, "SKILL.md"), "# Calendar Helper\n\nSummarize upcoming events.\n");
+  await writeFile(
+    path.join(input.skillPath, "SKILL.md"),
+    "# Calendar Helper\n\nSummarize upcoming events.\n",
+  );
   await writeFile(path.join(input.skillPath, "scripts", "install.sh"), "echo install\n");
 
   const first = await buildSkillSnapshot(input);
@@ -139,7 +134,10 @@ test("buildSkillSnapshot inventories symlinks without traversing them", async (t
   await mkdir(externalRoot, { recursive: true });
   await writeFile(path.join(input.skillPath, "SKILL.md"), "# Calendar Helper\n\nSummary.\n");
   await writeFile(path.join(externalRoot, "secret.txt"), "top secret\n");
-  await symlink(path.join(externalRoot, "secret.txt"), path.join(input.skillPath, "linked-secret.txt"));
+  await symlink(
+    path.join(externalRoot, "secret.txt"),
+    path.join(input.skillPath, "linked-secret.txt"),
+  );
 
   const before = await buildSkillSnapshot(input);
   assert.equal(before.ok, true);

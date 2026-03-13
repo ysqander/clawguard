@@ -213,7 +213,11 @@ function buildTextSources(snapshot: SkillSnapshot): TextSource[] {
 
 function buildMetadataSources(snapshot: SkillSnapshot): TextSource[] {
   const sources: TextSource[] = [];
-  const skillMdText = [snapshot.slug, snapshot.metadata?.skillMd.title, snapshot.metadata?.skillMd.summary]
+  const skillMdText = [
+    snapshot.slug,
+    snapshot.metadata?.skillMd.title,
+    snapshot.metadata?.skillMd.summary,
+  ]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
     .join("\n");
 
@@ -316,7 +320,10 @@ function normalizeEvidenceLine(line: string): string {
 }
 
 function computeRiskScore(findings: StaticFinding[]): number {
-  const baseScore = findings.reduce((total, finding) => total + severityWeight[finding.severity], 0);
+  const baseScore = findings.reduce(
+    (total, finding) => total + severityWeight[finding.severity],
+    0,
+  );
   const diversityBonus = Math.max(0, findings.length - 1) * 5;
   return Math.min(100, baseScore + diversityBonus);
 }
