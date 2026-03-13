@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, rmSync } from "node:fs";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
 
 import {
   daemonRequestEnvelopeValidator,
+  resolveDaemonSocketPath,
   type ScanRecord,
   type StaticScanReport,
   type DaemonErrorResponse,
@@ -19,12 +19,11 @@ import {
   discoverOpenClawWorkspaceModel,
   SkillWatcherPipeline,
 } from "@clawguard/discovery";
-import { createPlatformAdapter } from "@clawguard/platform";
+import { createPlatformAdapter, type PlatformAdapter } from "@clawguard/platform";
 import { persistSynthesizedStaticReport, synthesizeStaticReport } from "@clawguard/reports";
 import { scanSkillSnapshot } from "@clawguard/scanner";
-import { createStorage, type StoredStaticReport } from "@clawguard/storage";
+import { createStorage, type StoragePaths, type StoredStaticReport } from "@clawguard/storage";
 
-const DEFAULT_SOCKET_PATH = path.join(os.tmpdir(), "clawguard-daemon.sock");
 const MAX_QUEUE_DEPTH = 64;
 const SCAN_RETRY_LIMIT = 2;
 const RETRY_DELAY_MS = 150;
@@ -43,21 +42,28 @@ interface QueuedScanJob {
 
 export interface StartDaemonOptions {
   socketPath?: string;
+  storagePaths?: Partial<StoragePaths>;
+  startWatcher?: boolean;
 }
 
 export class DaemonServer {
   private readonly socketPath: string;
   private readonly server: net.Server;
-  private readonly storage = createStorage();
-  private readonly lifecycle = new SkillLifecycleManager({ storage: this.storage });
+  private readonly storage: ReturnType<typeof createStorage>;
+  private readonly lifecycle: SkillLifecycleManager;
   private readonly scanQueue: QueuedScanJob[] = [];
   private readonly inflightScanByKey = new Map<string, Promise<ScanJobResult>>();
-  private readonly platform = createPlatformAdapter();
+  private readonly startWatcher: boolean;
+  private readonly platform: PlatformAdapter | undefined;
   private watcherPipeline: SkillWatcherPipeline | undefined;
   private queueRunning = false;
 
   public constructor(options: StartDaemonOptions = {}) {
     this.socketPath = options.socketPath ?? resolveDaemonSocketPath();
+    this.startWatcher = options.startWatcher ?? true;
+    this.storage = createStorage(options.storagePaths);
+    this.lifecycle = new SkillLifecycleManager({ storage: this.storage });
+    this.platform = this.startWatcher ? createPlatformAdapter() : undefined;
     this.server = net.createServer((socket) => {
       let buffer = "";
       socket.setEncoding("utf8");
@@ -92,7 +98,9 @@ export class DaemonServer {
       });
     });
 
-    await this.startWatcherPipeline();
+    if (this.startWatcher) {
+      await this.startWatcherPipeline();
+    }
   }
 
   public async stop(): Promise<void> {
@@ -110,6 +118,10 @@ export class DaemonServer {
   }
 
   private async startWatcherPipeline(): Promise<void> {
+    if (!this.platform) {
+      return;
+    }
+
     try {
       const workspaceModel = await discoverOpenClawWorkspaceModel();
       this.watcherPipeline = new SkillWatcherPipeline({
@@ -190,23 +202,27 @@ export class DaemonServer {
             );
           }
 
-          const decision =
+          await (
             request.payload.command === "allow"
-              ? await this.lifecycle.allowHash({
+              ? this.lifecycle.applyOperatorAllow({
+                  skillSlug: report.report.snapshot.slug,
                   contentHash: report.report.snapshot.contentHash,
                   ...(request.payload.reason ? { reason: request.payload.reason } : {}),
                 })
-              : await this.lifecycle.blockHash({
+              : this.lifecycle.applyOperatorBlock({
+                  skillSlug: report.report.snapshot.slug,
                   contentHash: report.report.snapshot.contentHash,
+                  skillPath: report.report.snapshot.path,
                   ...(request.payload.reason ? { reason: request.payload.reason } : {}),
-                });
+                })
+          );
 
-          return this.successResponse(request.requestId, {
-            summary: report.summary,
-            report: report.report,
-            decision,
-            artifacts: report.artifacts,
-          });
+          const refreshedReport = await this.storage.getLatestStaticReportBySlug(request.payload.slug);
+          if (!refreshedReport) {
+            throw new Error(`No static report found for slug ${request.payload.slug} after update`);
+          }
+
+          return this.successResponse(request.requestId, this.toReportResponse(refreshedReport));
         }
         case "audit":
           return this.successResponse(request.requestId, { scans: [] });
@@ -329,11 +345,12 @@ export class DaemonServer {
     });
     const persisted = await persistSynthesizedStaticReport(this.storage, synthesis);
 
-    await this.lifecycle.resolveSkillLifecycle({
+    await this.lifecycle.applyPostScanDisposition({
       scanId: scan.scanId,
       skillSlug: scanReport.snapshot.slug,
       skillPath,
       contentHash: scanReport.snapshot.contentHash,
+      recommendation: scanReport.recommendation,
     });
 
     return {
@@ -393,10 +410,7 @@ export class DaemonServer {
     };
   }
 }
-
-export function resolveDaemonSocketPath(): string {
-  return process.env.CLAWGUARD_DAEMON_SOCKET ?? DEFAULT_SOCKET_PATH;
-}
+export { resolveDaemonSocketPath };
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {

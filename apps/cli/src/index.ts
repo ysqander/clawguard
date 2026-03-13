@@ -5,12 +5,11 @@ import { randomUUID } from "node:crypto";
 
 import {
   daemonResponseEnvelopeValidator,
+  resolveDaemonSocketPath,
   type DaemonRequestEnvelope,
   type DaemonRequestPayload,
   type DaemonResponseEnvelope,
 } from "@clawguard/contracts";
-
-const DEFAULT_SOCKET_PATH = process.env.CLAWGUARD_DAEMON_SOCKET ?? "/tmp/clawguard-daemon.sock";
 
 async function main(): Promise<void> {
   const [, , command = "status", ...rest] = process.argv;
@@ -79,7 +78,7 @@ async function sendDaemonRequest(payload: DaemonRequestPayload): Promise<DaemonR
   };
 
   return new Promise((resolve, reject) => {
-    const socket = net.createConnection(DEFAULT_SOCKET_PATH);
+    const socket = net.createConnection(resolveDaemonSocketPath());
     let buffer = "";
 
     socket.setEncoding("utf8");

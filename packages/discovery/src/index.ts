@@ -349,10 +349,14 @@ export {
 
 export { SkillLifecycleManager } from "./lifecycle.js";
 export type {
+  ApplyOperatorAllowInput,
+  ApplyOperatorBlockInput,
+  ApplyPostScanDispositionInput,
   AllowHashInput,
   BlockHashInput,
   DeleteSkillInput,
   LifecycleResolution,
+  PostScanLifecycleResolution,
   QuarantineSkillInput,
   ResolveSkillLifecycleInput,
   RestoreSkillInput,
