@@ -25,6 +25,7 @@
     "@clawguard/platform": "workspace:*"
   },
   "devDependencies": {
+    "@clawguard/discovery": "workspace:*",
     "tsx": "^4.20.6"
   }
 }

@@ -22,6 +22,16 @@ export {
   type RuntimeCommandExecutor,
   type RuntimeCommandResult,
 } from "./runtime-provider.js";
+export {
+  defaultDetonationSandboxLayout,
+  prepareDetonationEnvironment,
+  runSandboxCommand,
+  type DetonationSandboxLayout,
+  type PrepareDetonationEnvironmentOptions,
+  type PreparedDetonationEnvironment,
+  type PreparedDetonationEnvironmentPaths,
+  type RunSandboxCommandOptions,
+} from "./environment.js";
 
 const DEFAULT_TIMEOUT_SECONDS = 90;
 const DETONATION_BENCHMARK_PROMPTS = [

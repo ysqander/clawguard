@@ -40,6 +40,7 @@ export interface DetonationRuntimeProvider {
   readonly runtime: DetonationRuntimeKind;
   readonly command: string;
   ensureSandboxImage(options?: EnsureSandboxImageOptions): Promise<EnsureSandboxImageResult>;
+  runRuntimeCommand(args: string[]): Promise<RuntimeCommandResult>;
 }
 
 export interface CreateDetonationRuntimeProviderOptions {
@@ -148,6 +149,10 @@ class ContainerRuntimeProvider implements DetonationRuntimeProvider {
       imageTag,
       source: "built",
     };
+  }
+
+  public async runRuntimeCommand(args: string[]): Promise<RuntimeCommandResult> {
+    return await this.commandExecutor.run(this.command, args);
   }
 
   private async imageExists(imageTag: string): Promise<boolean> {
