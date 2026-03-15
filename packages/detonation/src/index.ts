@@ -32,6 +32,15 @@ export {
   type PreparedDetonationEnvironmentPaths,
   type RunSandboxCommandOptions,
 } from "./environment.js";
+export {
+  buildPromptRunnerPlan,
+  runPromptRunner,
+  type PromptRunnerExecutionRecord,
+  type PromptRunnerPlan,
+  type PromptRunnerPlanStep,
+  type PromptRunnerResult,
+  type RunPromptRunnerOptions,
+} from "./prompt-runner.js";
 
 const DEFAULT_TIMEOUT_SECONDS = 90;
 const DETONATION_BENCHMARK_PROMPTS = [
