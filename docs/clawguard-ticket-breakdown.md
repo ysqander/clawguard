@@ -10,7 +10,7 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-14, the repo has landed the main code and documentation for `CG-001` through `CG-017`, plus `CG-014`.
+As of 2026-03-15, the repo has landed the main code and documentation for `CG-001` through `CG-014`, plus `CG-017`.
 
 `CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness, but full detonation execution benchmarking remains blocked on `CG-015` and `CG-016`.
 
@@ -371,14 +371,16 @@ Depends on: `CG-007`, `CG-012`, `CG-017`
 
 Scope:
 
-- Implement `report`, `allow`, `block`, `scan`, `detonate`, `status`, and `audit`.
+- Implement `report`, `allow`, `block`, `scan`, `status`, and `audit` end-to-end against daemon-backed state.
+- Keep the `detonate` command on the CLI surface, but make its pre-Milestone-B behavior explicit and actionable.
 - Format terminal output for both concise and detailed reports.
 - Handle daemon-unavailable and runtime-unavailable cases cleanly.
 
 Acceptance criteria:
 
-- All spec commands work end-to-end against daemon-backed state.
+- Static-path commands (`report`, `allow`, `block`, `scan`, `status`, and `audit`) work end-to-end against daemon-backed state.
 - Operators can review and resolve quarantine decisions from the CLI.
+- `detonate` returns a clear, actionable "not implemented yet" response until behavioral orchestration lands.
 - Error messages are actionable and non-ambiguous.
 
 ### CG-019 Implement macOS notifications and launchd service setup
@@ -459,27 +461,32 @@ Acceptance criteria:
 - Docs clearly explain scope limits, Podman default, and VirusTotal caveats.
 - Demo assets show both static detection and workflow-malware detonation.
 
-## Recommended ticket order
+## Recommended next ticket order
 
-Start with:
+Immediate next tickets:
 
-- `CG-001`
-- `CG-002`
-- `CG-020`
+- `CG-018`
+- `CG-015`
+- `CG-016`
 
 Current recommended parallel work:
 
-- `CG-017` (daemon orchestration + IPC)
-- `CG-018` (CLI UX and formatting against mocked/stubbed IPC payloads while `CG-017` lands)
-- `CG-013` (optional Milestone B runtime-provider scaffolding if staffing allows)
+- `CG-018` to close Milestone A with operator-ready CLI coverage on top of the completed daemon/static/reporting flow
+- `CG-015` on the isolated detonation package boundary, in parallel with `CG-018`
+- optional prep-only slicing of `CG-019` for notification and service wiring once `CG-018` command and output shapes are stable
 
 Remaining Static MVP critical path:
 
-- `CG-017` -> `CG-018`
+- `CG-018`
 
 Behavioral MVP critical path:
 
-- `CG-013` -> `CG-014` -> `CG-015` -> `CG-016` -> `CG-021`
+- `CG-015` -> `CG-016` -> `CG-021`
+
+Tickets that should wait for dependencies to settle:
+
+- `CG-019` until `CG-018` lands, unless it is explicitly split into prep-only wiring work
+- `CG-021` until both `CG-016` and `CG-018` land
 
 Launch candidate closeout:
 
