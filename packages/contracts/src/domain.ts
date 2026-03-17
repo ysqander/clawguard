@@ -32,6 +32,7 @@ export const artifactTypes = [
   "static-report",
   "detonation-stdout",
   "detonation-stderr",
+  "detonation-trace",
   "network-capture",
   "memory-diff",
   "file-diff",
@@ -194,7 +195,58 @@ export interface DetonationReport {
   summary: string;
   triggeredActions: string[];
   artifacts: ArtifactRef[];
+  telemetry?: DetonationTelemetryEvent[];
+  intelligence?: ThreatIntelVerdict[];
   generatedAt: string;
+}
+
+export const detonationTelemetryEventTypes = ["process", "network", "file", "memory"] as const;
+export type DetonationTelemetryEventType = (typeof detonationTelemetryEventTypes)[number];
+
+export const detonationNetworkProtocols = ["tcp", "udp"] as const;
+export type DetonationNetworkProtocol = (typeof detonationNetworkProtocols)[number];
+
+export const detonationFileOperations = ["read", "write", "create", "delete", "rename"] as const;
+export type DetonationFileOperation = (typeof detonationFileOperations)[number];
+
+export interface DetonationProcessObservation {
+  command: string;
+  args: string[];
+  exitCode?: number;
+}
+
+export interface DetonationNetworkObservation {
+  protocol: DetonationNetworkProtocol;
+  address: string;
+  port: number;
+}
+
+export interface DetonationFileObservation {
+  operation: DetonationFileOperation;
+  path: string;
+  contentHash?: string;
+}
+
+export interface DetonationMemoryObservation {
+  name: "memory" | "soul" | "user";
+  beforeHash: string;
+  afterHash: string;
+}
+
+export interface DetonationTelemetryEvent {
+  eventId: string;
+  type: DetonationTelemetryEventType;
+  detail: string;
+  observedAt: string;
+  stepId?: string;
+  indicator?: {
+    subjectType: ThreatIntelSubject;
+    subject: string;
+  };
+  process?: DetonationProcessObservation;
+  network?: DetonationNetworkObservation;
+  file?: DetonationFileObservation;
+  memory?: DetonationMemoryObservation;
 }
 
 export interface DecisionRecord {
@@ -467,13 +519,124 @@ function parseDetonationRequest(input: unknown, path: string): DetonationRequest
 }
 
 function parseDetonationReport(input: unknown, path: string): DetonationReport {
-  return parseObject(input, path, (record) => ({
-    request: parseDetonationRequest(record.request, `${path}.request`),
-    summary: parseNonEmptyString(record.summary, `${path}.summary`),
-    triggeredActions: parseStringArray(record.triggeredActions, `${path}.triggeredActions`),
-    artifacts: parseArray(record.artifacts, parseArtifactRef, `${path}.artifacts`),
-    generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`),
-  }));
+  return parseObject(input, path, (record) => {
+    const telemetry = parseOptional(
+      record.telemetry,
+      (value, currentPath) => parseArray(value, parseDetonationTelemetryEvent, currentPath),
+      `${path}.telemetry`,
+    );
+    const intelligence = parseOptional(
+      record.intelligence,
+      (value, currentPath) => parseArray(value, parseThreatIntelVerdict, currentPath),
+      `${path}.intelligence`,
+    );
+
+    return {
+      request: parseDetonationRequest(record.request, `${path}.request`),
+      summary: parseNonEmptyString(record.summary, `${path}.summary`),
+      triggeredActions: parseStringArray(record.triggeredActions, `${path}.triggeredActions`),
+      artifacts: parseArray(record.artifacts, parseArtifactRef, `${path}.artifacts`),
+      ...(telemetry !== undefined ? { telemetry } : {}),
+      ...(intelligence !== undefined ? { intelligence } : {}),
+      generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`),
+    };
+  });
+}
+
+function parseDetonationTelemetryEvent(input: unknown, path: string): DetonationTelemetryEvent {
+  return parseObject(input, path, (record) => {
+    const stepId = parseOptional(record.stepId, parseNonEmptyString, `${path}.stepId`);
+    const indicator = parseOptional(
+      record.indicator,
+      (value, currentPath) =>
+        parseObject(value, currentPath, (indicatorRecord) => ({
+          subjectType: parseEnum(
+            indicatorRecord.subjectType,
+            intelligenceSubjects,
+            `${currentPath}.subjectType`,
+          ),
+          subject: parseNonEmptyString(indicatorRecord.subject, `${currentPath}.subject`),
+        })),
+      `${path}.indicator`,
+    );
+    const process = parseOptional(
+      record.process,
+      (value, currentPath) =>
+        parseObject(value, currentPath, (processRecord) => {
+          const exitCode = parseOptional(
+            processRecord.exitCode,
+            parseInteger,
+            `${currentPath}.exitCode`,
+          );
+
+          return {
+            command: parseNonEmptyString(processRecord.command, `${currentPath}.command`),
+            args: parseStringArray(processRecord.args, `${currentPath}.args`),
+            ...(exitCode !== undefined ? { exitCode } : {}),
+          };
+        }),
+      `${path}.process`,
+    );
+    const network = parseOptional(
+      record.network,
+      (value, currentPath) =>
+        parseObject(value, currentPath, (networkRecord) => ({
+          protocol: parseEnum(
+            networkRecord.protocol,
+            detonationNetworkProtocols,
+            `${currentPath}.protocol`,
+          ),
+          address: parseNonEmptyString(networkRecord.address, `${currentPath}.address`),
+          port: parseInteger(networkRecord.port, `${currentPath}.port`),
+        })),
+      `${path}.network`,
+    );
+    const file = parseOptional(
+      record.file,
+      (value, currentPath) =>
+        parseObject(value, currentPath, (fileRecord) => {
+          const contentHash = parseOptional(
+            fileRecord.contentHash,
+            parseNonEmptyString,
+            `${currentPath}.contentHash`,
+          );
+
+          return {
+            operation: parseEnum(
+              fileRecord.operation,
+              detonationFileOperations,
+              `${currentPath}.operation`,
+            ),
+            path: parseNonEmptyString(fileRecord.path, `${currentPath}.path`),
+            ...(contentHash !== undefined ? { contentHash } : {}),
+          };
+        }),
+      `${path}.file`,
+    );
+    const memory = parseOptional(
+      record.memory,
+      (value, currentPath) =>
+        parseObject(value, currentPath, (memoryRecord) => ({
+          name: parseEnum(memoryRecord.name, ["memory", "soul", "user"] as const, `${currentPath}.name`),
+          beforeHash: parseNonEmptyString(memoryRecord.beforeHash, `${currentPath}.beforeHash`),
+          afterHash: parseNonEmptyString(memoryRecord.afterHash, `${currentPath}.afterHash`),
+        })),
+      `${path}.memory`,
+    );
+
+    return {
+      eventId: parseNonEmptyString(record.eventId, `${path}.eventId`),
+      type: parseEnum(record.type, detonationTelemetryEventTypes, `${path}.type`),
+      detail: parseNonEmptyString(record.detail, `${path}.detail`),
+      observedAt: parseIsoDateTime(record.observedAt, `${path}.observedAt`),
+      ...(stepId !== undefined ? { stepId } : {}),
+      ...(indicator !== undefined ? { indicator } : {}),
+      ...(process !== undefined ? { process } : {}),
+      ...(network !== undefined ? { network } : {}),
+      ...(file !== undefined ? { file } : {}),
+      ...(memory !== undefined ? { memory } : {}),
+    };
+  });
 }
 
 function parseDecisionRecord(input: unknown, path: string): DecisionRecord {

@@ -46,6 +46,7 @@ test("prepareDetonationEnvironment creates the expected layout and baseline", as
     await assertPathExists(environment.host.honeypots.envFile);
     await assertPathExists(environment.host.honeypots.sshKey);
     await assertPathExists(environment.host.helpers.promptHarness);
+    await assertPathExists(path.join(environment.host.workspaceDir, ".clawguard", "traces"));
     await assertPathExists(path.join(environment.host.skillDir, "SKILL.md"));
     await assertPathExists(path.join(environment.host.skillDir, "scripts", "install.sh"));
     await assertPathExists(environment.baseline.memoryFiles.memory);
@@ -244,6 +245,7 @@ test("runSandboxCommand forwards timeout options to the runtime provider", async
   const request = buildDetonationBenchmarkRequest("malicious-staged-download");
   const environment = await prepareDetonationEnvironment(request);
   let observedTimeoutMs: number | undefined;
+  let observedArgs: string[] = [];
 
   try {
     await runSandboxCommand(
@@ -258,7 +260,8 @@ test("runSandboxCommand forwards timeout options to the runtime provider", async
             source: "cache",
           };
         },
-        async runRuntimeCommand(_args, options) {
+        async runRuntimeCommand(args, options) {
+          observedArgs = args;
           observedTimeoutMs = options?.timeoutMs;
           return {
             exitCode: 0,
@@ -274,6 +277,10 @@ test("runSandboxCommand forwards timeout options to the runtime provider", async
     );
 
     assert.equal(observedTimeoutMs, 2500);
+    assert.equal(observedArgs.includes("--cap-add=SYS_PTRACE"), true);
+    const seccompIndex = observedArgs.indexOf("seccomp=unconfined");
+    assert.ok(seccompIndex > 0, "seccomp=unconfined should be present in args");
+    assert.equal(observedArgs[seccompIndex - 1], "--security-opt", "seccomp=unconfined should follow --security-opt");
   } finally {
     await environment.cleanup();
   }

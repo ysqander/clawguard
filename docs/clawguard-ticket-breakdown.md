@@ -10,9 +10,9 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-16, the repo has landed the main code and documentation for `CG-001` through `CG-015`, plus `CG-017`.
+As of 2026-03-16, the repo has landed the main code and documentation for `CG-001` through `CG-017`.
 
-`CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness, but full detonation execution benchmarking remains blocked on `CG-016`.
+`CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness. Full detonation execution benchmarking can now land on top of the completed `CG-016` telemetry work.
 
 The next unfinished Milestone A ticket now starts with:
 
@@ -20,9 +20,9 @@ The next unfinished Milestone A ticket now starts with:
 
 The next unfinished Milestone B tickets now start with:
 
-- `CG-016`: telemetry capture and VT enrichment
+- `CG-021`: end-to-end regression and security validation
 
-`CG-020` remains partially complete until detonation execution benchmarking can land on top of `CG-016`, but its current fixture corpus and static benchmarking outputs are sufficient to support `CG-017`, `CG-018`, and `CG-015` implementation and validation.
+`CG-020` remains partially complete until detonation execution benchmarking lands, but its current fixture corpus and static benchmarking outputs are sufficient to support `CG-017`, `CG-018`, `CG-021`, and the detonation runtime work.
 
 ## Epic A: Monorepo Foundation
 
@@ -329,6 +329,7 @@ Acceptance criteria:
 Priority: `P1`
 Milestone: `B`
 Depends on: `CG-011`, `CG-014`, `CG-015`
+Status: `Complete`
 
 Scope:
 
@@ -423,7 +424,7 @@ Acceptance criteria:
 
 Note:
 
-- Full detonation execution benchmarking remains blocked on `CG-013` through `CG-016`; the current repo only includes a detonation runtime-readiness preflight harness.
+- Full detonation execution benchmarking is no longer blocked on `CG-016`; the current repo still only includes a detonation runtime-readiness preflight harness and needs the benchmark work itself.
 
 ### CG-021 Implement end-to-end regression and security validation
 
@@ -466,12 +467,12 @@ Acceptance criteria:
 Immediate next tickets:
 
 - `CG-018`
-- `CG-016`
+- `CG-021`
 
 Current recommended parallel work:
 
 - `CG-018` to close Milestone A with operator-ready CLI coverage on top of the completed daemon/static/reporting flow
-- `CG-016` on the isolated detonation package boundary, in parallel with `CG-018`
+- `CG-021` on top of the completed detonation telemetry package boundary and CLI coverage
 - optional prep-only slicing of `CG-019` for notification and service wiring once `CG-018` command and output shapes are stable
 
 Remaining Static MVP critical path:
@@ -480,12 +481,12 @@ Remaining Static MVP critical path:
 
 Behavioral MVP critical path:
 
-- `CG-016` -> `CG-021`
+- `CG-021`
 
 Tickets that should wait for dependencies to settle:
 
 - `CG-019` until `CG-018` lands, unless it is explicitly split into prep-only wiring work
-- `CG-021` until both `CG-016` and `CG-018` land
+- `CG-021` until `CG-018` lands
 
 Launch candidate closeout:
 

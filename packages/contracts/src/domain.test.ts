@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { exampleSkillSnapshot, skillSnapshotValidator } from "./index.js";
+import {
+  detonationReportValidator,
+  exampleDetonationReport,
+  exampleSkillSnapshot,
+  skillSnapshotValidator,
+} from "./index.js";
 
 test("skillSnapshotValidator accepts snapshots with metadata", () => {
   const parsed = skillSnapshotValidator.parse(exampleSkillSnapshot);
@@ -22,4 +27,12 @@ test("skillSnapshotValidator accepts snapshots without metadata", () => {
 
   assert.equal(parsed.slug, "minimal-skill");
   assert.equal(parsed.metadata, undefined);
+});
+
+test("detonationReportValidator accepts telemetry events with typed observations", () => {
+  const parsed = detonationReportValidator.parse(exampleDetonationReport);
+
+  assert.equal(parsed.telemetry?.[0]?.type, "network");
+  assert.equal(parsed.telemetry?.[0]?.network?.address, "93.184.216.34");
+  assert.equal(parsed.telemetry?.[0]?.indicator?.subjectType, "domain");
 });
