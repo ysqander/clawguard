@@ -81,6 +81,14 @@ export interface PromptRunnerResult {
   request: DetonationRequest;
   plan: PromptRunnerPlan;
   execution: PromptRunnerExecutionRecord[];
+  memoryDiffs: PromptRunnerMemoryDiff[];
+}
+
+export interface PromptRunnerMemoryDiff {
+  name: "memory" | "soul" | "user";
+  baselinePath: string;
+  currentPath: string;
+  changed: boolean;
 }
 
 export interface BuildPromptRunnerPlanOptions {
@@ -277,13 +285,48 @@ export async function runPromptRunner(
       }
     }
 
+    const memoryDiffs = await computeMemoryDiffs(environment);
+
     return {
       request,
       plan,
       execution,
+      memoryDiffs,
     };
   } finally {
     await environment?.cleanup();
+  }
+}
+
+async function computeMemoryDiffs(
+  environment: PreparedDetonationEnvironment,
+): Promise<PromptRunnerMemoryDiff[]> {
+  const files = ["memory", "soul", "user"] as const;
+  const diffs: PromptRunnerMemoryDiff[] = [];
+
+  for (const name of files) {
+    const baselinePath = environment.baseline.memoryFiles[name];
+    const currentPath = environment.host.memoryFiles[name];
+    const [baselineText, currentText] = await Promise.all([
+      readTextIfPresent(baselinePath),
+      readTextIfPresent(currentPath),
+    ]);
+    diffs.push({
+      name,
+      baselinePath,
+      currentPath,
+      changed: baselineText !== currentText,
+    });
+  }
+
+  return diffs;
+}
+
+async function readTextIfPresent(filePath: string): Promise<string> {
+  try {
+    return await readFile(filePath, "utf8");
+  } catch {
+    return "";
   }
 }
 

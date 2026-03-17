@@ -194,7 +194,24 @@ export interface DetonationReport {
   summary: string;
   triggeredActions: string[];
   artifacts: ArtifactRef[];
+  telemetry?: DetonationTelemetryEvent[];
+  intelligence?: ThreatIntelVerdict[];
   generatedAt: string;
+}
+
+export const detonationTelemetryEventTypes = ["process", "network", "file", "memory"] as const;
+export type DetonationTelemetryEventType = (typeof detonationTelemetryEventTypes)[number];
+
+export interface DetonationTelemetryEvent {
+  eventId: string;
+  type: DetonationTelemetryEventType;
+  detail: string;
+  observedAt: string;
+  stepId?: string;
+  indicator?: {
+    subjectType: ThreatIntelSubject;
+    subject: string;
+  };
 }
 
 export interface DecisionRecord {
@@ -467,13 +484,56 @@ function parseDetonationRequest(input: unknown, path: string): DetonationRequest
 }
 
 function parseDetonationReport(input: unknown, path: string): DetonationReport {
-  return parseObject(input, path, (record) => ({
-    request: parseDetonationRequest(record.request, `${path}.request`),
-    summary: parseNonEmptyString(record.summary, `${path}.summary`),
-    triggeredActions: parseStringArray(record.triggeredActions, `${path}.triggeredActions`),
-    artifacts: parseArray(record.artifacts, parseArtifactRef, `${path}.artifacts`),
-    generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`),
-  }));
+  return parseObject(input, path, (record) => {
+    const telemetry = parseOptional(
+      record.telemetry,
+      (value, currentPath) => parseArray(value, parseDetonationTelemetryEvent, currentPath),
+      `${path}.telemetry`,
+    );
+    const intelligence = parseOptional(
+      record.intelligence,
+      (value, currentPath) => parseArray(value, parseThreatIntelVerdict, currentPath),
+      `${path}.intelligence`,
+    );
+
+    return {
+      request: parseDetonationRequest(record.request, `${path}.request`),
+      summary: parseNonEmptyString(record.summary, `${path}.summary`),
+      triggeredActions: parseStringArray(record.triggeredActions, `${path}.triggeredActions`),
+      artifacts: parseArray(record.artifacts, parseArtifactRef, `${path}.artifacts`),
+      ...(telemetry !== undefined ? { telemetry } : {}),
+      ...(intelligence !== undefined ? { intelligence } : {}),
+      generatedAt: parseIsoDateTime(record.generatedAt, `${path}.generatedAt`),
+    };
+  });
+}
+
+function parseDetonationTelemetryEvent(input: unknown, path: string): DetonationTelemetryEvent {
+  return parseObject(input, path, (record) => {
+    const stepId = parseOptional(record.stepId, parseNonEmptyString, `${path}.stepId`);
+    const indicator = parseOptional(
+      record.indicator,
+      (value, currentPath) =>
+        parseObject(value, currentPath, (indicatorRecord) => ({
+          subjectType: parseEnum(
+            indicatorRecord.subjectType,
+            intelligenceSubjects,
+            `${currentPath}.subjectType`,
+          ),
+          subject: parseNonEmptyString(indicatorRecord.subject, `${currentPath}.subject`),
+        })),
+      `${path}.indicator`,
+    );
+
+    return {
+      eventId: parseNonEmptyString(record.eventId, `${path}.eventId`),
+      type: parseEnum(record.type, detonationTelemetryEventTypes, `${path}.type`),
+      detail: parseNonEmptyString(record.detail, `${path}.detail`),
+      observedAt: parseIsoDateTime(record.observedAt, `${path}.observedAt`),
+      ...(stepId !== undefined ? { stepId } : {}),
+      ...(indicator !== undefined ? { indicator } : {}),
+    };
+  });
 }
 
 function parseDecisionRecord(input: unknown, path: string): DecisionRecord {

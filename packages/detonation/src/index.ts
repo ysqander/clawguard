@@ -48,6 +48,12 @@ export {
   type PromptRunnerStepType,
   type RunPromptRunnerOptions,
 } from "./prompt-runner.js";
+export {
+  buildDetonationReportFromPromptRunner,
+  type BuildDetonationReportOptions,
+  type BuildDetonationReportResult,
+  type DetonationTelemetryVirusTotalClient,
+} from "./telemetry.js";
 
 const DEFAULT_TIMEOUT_SECONDS = 90;
 const DETONATION_BENCHMARK_PROMPTS = [
