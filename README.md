@@ -59,4 +59,22 @@ Run the detonation preflight benchmark, which verifies fixture loading, runtime 
 pnpm bench:detonation:preflight
 ```
 
-The repository now includes the foundation, discovery pipeline, first static scanner, threat-intelligence client foundations, and a reusable fixture corpus with a gated static benchmark harness plus an initial detonation preflight harness. Current progress and remaining work are tracked in [docs/clawguard-development-plan.md](docs/clawguard-development-plan.md) and [docs/clawguard-ticket-breakdown.md](docs/clawguard-ticket-breakdown.md). The architecture decisions behind the current foundation live in [docs/adr/README.md](docs/adr/README.md).
+Run the full detonation benchmark, which exercises the existing prompt runner and report-synthesis path for every detonation fixture when Podman or Docker is available, and otherwise reports a safe `runtime-unavailable` summary:
+
+```bash
+pnpm bench:detonation
+```
+
+Run the gated variant, which exits nonzero when an available runtime records fixture execution failures or exceeds the configured per-fixture budget:
+
+```bash
+pnpm bench:detonation:ci
+```
+
+Override the gated budget for local enforcement runs:
+
+```bash
+CLAWGUARD_BENCH_DETONATION_BUDGET_MS=60000 pnpm bench:detonation:ci
+```
+
+The repository now includes the foundation, discovery pipeline, first static scanner, threat-intelligence client foundations, and a reusable fixture corpus with gated static and detonation benchmark harnesses. Current progress and remaining work are tracked in [docs/clawguard-development-plan.md](docs/clawguard-development-plan.md) and [docs/clawguard-ticket-breakdown.md](docs/clawguard-ticket-breakdown.md). The architecture decisions behind the current foundation live in [docs/adr/README.md](docs/adr/README.md).

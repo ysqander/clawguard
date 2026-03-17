@@ -17,6 +17,8 @@
     "typecheck": "tsc -b --pretty false",
     "clean": "tsc -b --clean",
     "test": "node --test \"dist/**/*.test.js\"",
+    "bench:detonation": "node --conditions=source --import tsx ./src/benchmark-detonation.ts",
+    "bench:detonation:ci": "CLAWGUARD_BENCH_DETONATION_ENFORCE=1 node --conditions=source --import tsx ./src/benchmark-detonation.ts",
     "bench:detonation:preflight": "node --conditions=source --import tsx ./src/benchmark-detonation-preflight.ts"
   },
   "dependencies": {

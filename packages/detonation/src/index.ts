@@ -10,6 +10,16 @@ import {
 import { createPlatformAdapter, type ContainerRuntimeDetector } from "@clawguard/platform";
 
 export {
+  runDetonationBenchmark,
+  runDetonationBenchmarkCli,
+  type DetonationBenchmarkCliResult,
+  type DetonationBenchmarkExecutionResult,
+  type DetonationBenchmarkFailure,
+  type DetonationBenchmarkOptions,
+  type DetonationBenchmarkRow,
+  type DetonationBenchmarkSummary,
+} from "./benchmark-detonation.js";
+export {
   createChildProcessRuntimeCommandExecutor,
   createDetonationRuntimeProvider,
   defaultDetonationRuntime,
