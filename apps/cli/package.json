@@ -12,7 +12,9 @@
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false",
     "clean": "tsc -b --clean",
-    "dev": "node --enable-source-maps ./dist/index.js"
+    "dev": "node --enable-source-maps ./dist/index.js",
+    "pretest": "tsc -b",
+    "test": "node --test \"dist/**/*.test.js\""
   },
   "dependencies": {
     "@clawguard/contracts": "workspace:*",
