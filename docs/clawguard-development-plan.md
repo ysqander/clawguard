@@ -4,7 +4,7 @@ This plan translates the product spec in `docs/clawguard-spec-v2.docx` into a de
 
 ## Current status snapshot
 
-As of 2026-03-16, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, static report synthesis that merges local findings with enrichment signals (`CG-012`), the first Podman-first runtime provider with Docker-compatible sandbox-image preparation (`CG-013`), the first dummy OpenClaw detonation environment with honeypot scaffolding and smoke-run validation (`CG-014`), the staged-download prompt runner that executes reproducible prompt plans with setup-command sequencing and sandbox-side prompt execution (`CG-015`), detonation telemetry extraction with artifact persistence and non-blocking VirusTotal indicator enrichment (`CG-016`), daemon job orchestration plus Unix-socket IPC (`CG-017`), and the first reusable fixture corpus plus a gated static benchmark harness and initial detonation preflight harness (`CG-020`, partial until full detonation execution benchmarking is unblocked).
+As of 2026-03-16, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, static report synthesis that merges local findings with enrichment signals (`CG-012`), the first Podman-first runtime provider with Docker-compatible sandbox-image preparation (`CG-013`), the first dummy OpenClaw detonation environment with honeypot scaffolding and smoke-run validation (`CG-014`), the staged-download prompt runner that executes reproducible prompt plans with setup-command sequencing and sandbox-side prompt execution (`CG-015`), syscall-traced detonation telemetry with preserved raw artifacts plus decoupled VirusTotal indicator enrichment (`CG-016`), daemon job orchestration plus Unix-socket IPC (`CG-017`), and the first reusable fixture corpus plus a gated static benchmark harness and initial detonation preflight harness (`CG-020`, partial until full detonation execution benchmarking is unblocked).
 
 The main remaining Milestone A work now centers on:
 
@@ -14,7 +14,7 @@ The main remaining Milestone A work now centers on:
 Recommended immediate execution focus:
 
 - `CG-018` as the Milestone A critical-path next step, scoped to full static-path CLI coverage plus an actionable "not available yet" detonation path.
-- `CG-016` as the next Milestone B stream for telemetry capture, artifact persistence, and enrichment on top of the prompt runner.
+- `CG-021` as the next Milestone B stream for end-to-end behavioral validation on top of the completed detonation telemetry and CLI foundations.
 
 ## Confirmed architecture decisions
 

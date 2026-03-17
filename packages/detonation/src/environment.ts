@@ -58,6 +58,7 @@ bHktZG8tbm90LXVzZS1mb3ItYXV0aGVudGljYXRpb24K
 `;
 
 const PROMPT_HARNESS_RELATIVE_PATH = ".clawguard/prompt-harness.mjs";
+const TRACE_DIRECTORY_RELATIVE_PATH = ".clawguard/traces";
 const PROMPT_HARNESS_SOURCE = `import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -279,6 +280,7 @@ export async function prepareDetonationEnvironment(
   await mkdir(path.dirname(host.configPath), { recursive: true });
   await mkdir(path.dirname(host.honeypots.sshKey), { recursive: true });
   await mkdir(path.dirname(host.helpers.promptHarness), { recursive: true });
+  await mkdir(path.join(host.workspaceDir, TRACE_DIRECTORY_RELATIVE_PATH), { recursive: true });
   await mkdir(host.skillsDir, { recursive: true });
 
   await writeFile(host.configPath, renderOpenClawConfig(defaultDetonationSandboxLayout), "utf8");
@@ -346,6 +348,9 @@ export async function runSandboxCommand(
   return await provider.runRuntimeCommand([
     "run",
     "--rm",
+    "--cap-add=SYS_PTRACE",
+    "--security-opt",
+    "seccomp=unconfined",
     "--workdir",
     preparedEnvironment.container.workspaceDir,
     "--env",

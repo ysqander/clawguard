@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { lstat, readFile, readdir, readlink } from "node:fs/promises";
 import path from "node:path";
 
 import type { DetonationRequest } from "@clawguard/contracts";
@@ -32,10 +33,12 @@ const CODE_FENCE_PATTERN = /^```/u;
 const LIST_MARKER_PATTERN = /^(?:[-+*]|\d+\.)\s+/u;
 const SHELL_PROMPT_PATTERN = /^\$\s+/u;
 const SHELL_FENCE_INFO_PATTERN = /^(?:bash|sh|zsh|shell|shell-session|console)$/iu;
+const TRACE_DIRECTORY_RELATIVE_PATH = path.posix.join(".clawguard", "traces");
 
 export type PromptRunnerStepType = "prompt" | "setup-command";
 export type PromptRunnerStepExecutor = "prompt-harness" | "shell-command";
 export type PromptRunnerExecutionStatus = "completed" | "failed" | "skipped";
+export type PromptRunnerFileChangeKind = "created" | "modified" | "deleted";
 export type PromptRunnerStepIntent =
   | "summarize-capabilities"
   | "run-setup-review"
@@ -82,13 +85,38 @@ export interface PromptRunnerResult {
   plan: PromptRunnerPlan;
   execution: PromptRunnerExecutionRecord[];
   memoryDiffs: PromptRunnerMemoryDiff[];
+  fileChanges: PromptRunnerFileChange[];
+  stepTraces: PromptRunnerStepTrace[];
 }
 
 export interface PromptRunnerMemoryDiff {
   name: "memory" | "soul" | "user";
-  baselinePath: string;
-  currentPath: string;
   changed: boolean;
+  baselineHash: string;
+  currentHash: string;
+  baselineContent: string;
+  currentContent: string;
+  diffText: string;
+}
+
+export interface PromptRunnerFileChange {
+  path: string;
+  kind: PromptRunnerFileChangeKind;
+  baselineHash?: string;
+  currentHash?: string;
+  baselineContent?: string;
+  currentContent?: string;
+  diffText?: string;
+}
+
+export interface PromptRunnerStepTraceFile {
+  filename: string;
+  content: string;
+}
+
+export interface PromptRunnerStepTrace {
+  stepId: string;
+  files: PromptRunnerStepTraceFile[];
 }
 
 export interface BuildPromptRunnerPlanOptions {
@@ -121,6 +149,12 @@ interface CommandCandidate {
 interface StepInvocation {
   command: string;
   args: string[];
+}
+
+interface FileSnapshotEntry {
+  containerPath: string;
+  hash: string;
+  content?: string;
 }
 
 export async function buildPromptRunnerPlan(
@@ -202,6 +236,7 @@ export async function runPromptRunner(
   try {
     environment = await prepareEnvironment(request);
     const execution: PromptRunnerExecutionRecord[] = [];
+    const stepTraces: PromptRunnerStepTrace[] = [];
 
     for (let index = 0; index < plan.steps.length; index += 1) {
       const step = plan.steps[index];
@@ -209,6 +244,10 @@ export async function runPromptRunner(
         continue;
       }
       const invocation = buildStepInvocation(step, environment);
+      const tracedInvocation =
+        commandRunner === runSandboxCommand
+          ? buildTracedInvocation(step.id, invocation, environment)
+          : invocation;
       const remainingTimeoutMs = deadlineMs - Date.now();
 
       if (remainingTimeoutMs <= 0) {
@@ -237,13 +276,17 @@ export async function runPromptRunner(
         const result = await commandRunner(
           provider,
           environment,
-          invocation.command,
-          invocation.args,
+          tracedInvocation.command,
+          tracedInvocation.args,
           {
             timeoutMs: remainingTimeoutMs,
           },
         );
         const completedAt = new Date().toISOString();
+        const trace = await collectStepTrace(step.id, environment);
+        if (trace) {
+          stepTraces.push(trace);
+        }
 
         execution.push({
           stepId: step.id,
@@ -266,6 +309,10 @@ export async function runPromptRunner(
         }
       } catch (error) {
         const completedAt = new Date().toISOString();
+        const trace = await collectStepTrace(step.id, environment);
+        if (trace) {
+          stepTraces.push(trace);
+        }
         execution.push({
           stepId: step.id,
           type: step.type,
@@ -286,12 +333,15 @@ export async function runPromptRunner(
     }
 
     const memoryDiffs = await computeMemoryDiffs(environment);
+    const fileChanges = await computeFileChanges(environment);
 
     return {
       request,
       plan,
       execution,
       memoryDiffs,
+      fileChanges,
+      stepTraces,
     };
   } finally {
     await environment?.cleanup();
@@ -313,13 +363,100 @@ async function computeMemoryDiffs(
     ]);
     diffs.push({
       name,
-      baselinePath,
-      currentPath,
       changed: baselineText !== currentText,
+      baselineHash: hashText(baselineText),
+      currentHash: hashText(currentText),
+      baselineContent: baselineText,
+      currentContent: currentText,
+      diffText: createUnifiedDiff(`${name}.before`, `${name}.after`, baselineText, currentText),
     });
   }
 
   return diffs;
+}
+
+async function computeFileChanges(
+  environment: PreparedDetonationEnvironment,
+): Promise<PromptRunnerFileChange[]> {
+  const [baselineWorkspace, currentWorkspace, baselineHome, currentHome] = await Promise.all([
+    collectFileSnapshots(environment.baseline.workspaceDir, environment.container.workspaceDir),
+    collectFileSnapshots(environment.host.workspaceDir, environment.container.workspaceDir),
+    collectFileSnapshots(environment.baseline.homeDir, environment.container.homeDir),
+    collectFileSnapshots(environment.host.homeDir, environment.container.homeDir),
+  ]);
+  const baseline = new Map([...baselineWorkspace, ...baselineHome]);
+  const current = new Map([...currentWorkspace, ...currentHome]);
+  const containerPaths = new Set([...baseline.keys(), ...current.keys()]);
+  const changes: PromptRunnerFileChange[] = [];
+
+  for (const containerPath of [...containerPaths].sort((left, right) => left.localeCompare(right))) {
+    const before = baseline.get(containerPath);
+    const after = current.get(containerPath);
+    if (before && !after) {
+      const change: PromptRunnerFileChange = {
+        path: containerPath,
+        kind: "deleted",
+        baselineHash: before.hash,
+        ...(before.content !== undefined ? { baselineContent: before.content } : {}),
+        ...(before.content !== undefined
+          ? {
+              diffText: createUnifiedDiff(
+                `${containerPath}.before`,
+                `${containerPath}.after`,
+                before.content,
+                "",
+              ),
+            }
+          : {}),
+      };
+      changes.push(change);
+      continue;
+    }
+    if (!before && after) {
+      const change: PromptRunnerFileChange = {
+        path: containerPath,
+        kind: "created",
+        currentHash: after.hash,
+        ...(after.content !== undefined ? { currentContent: after.content } : {}),
+        ...(after.content !== undefined
+          ? {
+              diffText: createUnifiedDiff(
+                `${containerPath}.before`,
+                `${containerPath}.after`,
+                "",
+                after.content,
+              ),
+            }
+          : {}),
+      };
+      changes.push(change);
+      continue;
+    }
+    if (!before || !after || before.hash === after.hash) {
+      continue;
+    }
+    const change: PromptRunnerFileChange = {
+      path: containerPath,
+      kind: "modified",
+      baselineHash: before.hash,
+      currentHash: after.hash,
+      ...(before.content !== undefined ? { baselineContent: before.content } : {}),
+      ...(after.content !== undefined ? { currentContent: after.content } : {}),
+      ...(before.content !== undefined && after.content !== undefined
+        ? {
+            diffText: createUnifiedDiff(
+              `${containerPath}.before`,
+              `${containerPath}.after`,
+              before.content,
+              after.content,
+            ),
+          }
+        : {}),
+    };
+    changes.push(change);
+  }
+
+  return changes;
 }
 
 async function readTextIfPresent(filePath: string): Promise<string> {
@@ -701,6 +838,29 @@ function buildStepInvocation(
   };
 }
 
+function buildTracedInvocation(
+  stepId: string,
+  invocation: StepInvocation,
+  environment: PreparedDetonationEnvironment,
+): StepInvocation {
+  return {
+    command: "strace",
+    args: [
+      "-ff",
+      "-tt",
+      "-s",
+      "4096",
+      "-yy",
+      "-e",
+      "trace=execve,process,file,network",
+      "-o",
+      path.posix.join(environment.container.workspaceDir, TRACE_DIRECTORY_RELATIVE_PATH, `${stepId}.trace`),
+      invocation.command,
+      ...invocation.args,
+    ],
+  };
+}
+
 function appendSkippedSteps(
   steps: PromptRunnerPlanStep[],
   execution: PromptRunnerExecutionRecord[],
@@ -727,4 +887,139 @@ function toShellLiteral(value: string): string {
 
 function extractCodeFenceInfo(line: string): string {
   return line.trim().slice(3).trim();
+}
+
+async function collectStepTrace(
+  stepId: string,
+  environment: PreparedDetonationEnvironment,
+): Promise<PromptRunnerStepTrace | undefined> {
+  const traceDirectory = path.join(environment.host.workspaceDir, TRACE_DIRECTORY_RELATIVE_PATH);
+  let entries;
+  try {
+    entries = await readdir(traceDirectory, { withFileTypes: true });
+  } catch {
+    return undefined;
+  }
+
+  const prefix = `${stepId}.trace.`;
+  const files: PromptRunnerStepTraceFile[] = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.startsWith(prefix)) {
+      continue;
+    }
+    const content = await readTextIfPresent(path.join(traceDirectory, entry.name));
+    files.push({
+      filename: entry.name,
+      content,
+    });
+  }
+
+  files.sort((left, right) => left.filename.localeCompare(right.filename));
+  return files.length > 0 ? { stepId, files } : undefined;
+}
+
+async function collectFileSnapshots(
+  rootDir: string,
+  containerRoot: string,
+): Promise<Map<string, FileSnapshotEntry>> {
+  const snapshots = new Map<string, FileSnapshotEntry>();
+
+  async function visit(relativePath = ""): Promise<void> {
+    const directoryPath = path.join(rootDir, relativePath);
+    let entries;
+    try {
+      entries = await readdir(directoryPath, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      const childRelativePath = relativePath.length > 0 ? path.join(relativePath, entry.name) : entry.name;
+      const childPosixPath = childRelativePath.split(path.sep).join(path.posix.sep);
+      if (childPosixPath === ".clawguard" || childPosixPath.startsWith(".clawguard/")) {
+        continue;
+      }
+
+      const childHostPath = path.join(rootDir, childRelativePath);
+      if (entry.isDirectory()) {
+        await visit(childRelativePath);
+        continue;
+      }
+
+      const snapshot = await readFileSnapshot(childHostPath, path.posix.join(containerRoot, childPosixPath));
+      if (snapshot) {
+        snapshots.set(snapshot.containerPath, snapshot);
+      }
+    }
+  }
+
+  await visit();
+  return snapshots;
+}
+
+async function readFileSnapshot(
+  hostPath: string,
+  containerPath: string,
+): Promise<FileSnapshotEntry | undefined> {
+  try {
+    const stats = await lstat(hostPath);
+    if (stats.isSymbolicLink()) {
+      const target = await readlink(hostPath);
+      return {
+        containerPath,
+        hash: hashText(`symlink:${target}`),
+        content: `symlink:${target}`,
+      };
+    }
+    if (!stats.isFile()) {
+      return undefined;
+    }
+
+    const buffer = await readFile(hostPath);
+    const snapshot: FileSnapshotEntry = {
+      containerPath,
+      hash: hashBuffer(buffer),
+    };
+    const content = toTextContent(buffer);
+    return content !== undefined ? { ...snapshot, content } : snapshot;
+  } catch {
+    return undefined;
+  }
+}
+
+function toTextContent(buffer: Buffer): string | undefined {
+  if (buffer.includes(0)) {
+    return undefined;
+  }
+  return buffer.toString("utf8");
+}
+
+function hashBuffer(buffer: Buffer): string {
+  return `sha256:${createHash("sha256").update(buffer).digest("hex")}`;
+}
+
+function hashText(value: string): string {
+  return hashBuffer(Buffer.from(value, "utf8"));
+}
+
+function createUnifiedDiff(beforeLabel: string, afterLabel: string, before: string, after: string): string {
+  if (before === after) {
+    return "";
+  }
+
+  const lines = [`--- ${beforeLabel}`, `+++ ${afterLabel}`, "@@"];
+  for (const line of splitLines(before)) {
+    lines.push(`-${line}`);
+  }
+  for (const line of splitLines(after)) {
+    lines.push(`+${line}`);
+  }
+  return lines.join("\n");
+}
+
+function splitLines(value: string): string[] {
+  if (value.length === 0) {
+    return [];
+  }
+  return value.replace(/\r\n/gu, "\n").split("\n");
 }

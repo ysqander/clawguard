@@ -132,6 +132,11 @@ export const exampleDetonationReport: DetonationReport = {
       type: "network",
       detail: "Observed outbound request to example.com",
       observedAt: "2026-03-08T00:00:03.000Z",
+      network: {
+        protocol: "tcp",
+        address: "93.184.216.34",
+        port: 443,
+      },
       indicator: {
         subjectType: "domain",
         subject: "example.com",

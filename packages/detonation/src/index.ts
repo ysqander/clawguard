@@ -39,10 +39,15 @@ export {
   runPromptRunner,
   type BuildPromptRunnerPlanOptions,
   type PromptRunnerExecutionRecord,
+  type PromptRunnerFileChange,
+  type PromptRunnerFileChangeKind,
   type PromptRunnerExecutionStatus,
+  type PromptRunnerMemoryDiff,
   type PromptRunnerPlan,
   type PromptRunnerPlanStep,
   type PromptRunnerResult,
+  type PromptRunnerStepTrace,
+  type PromptRunnerStepTraceFile,
   type PromptRunnerStepExecutor,
   type PromptRunnerStepIntent,
   type PromptRunnerStepType,
@@ -53,6 +58,7 @@ export {
   type BuildDetonationReportOptions,
   type BuildDetonationReportResult,
   type DetonationTelemetryVirusTotalClient,
+  enrichDetonationTelemetryIndicators,
 } from "./telemetry.js";
 
 const DEFAULT_TIMEOUT_SECONDS = 90;
