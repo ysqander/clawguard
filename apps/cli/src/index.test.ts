@@ -36,6 +36,7 @@ test("buildPayload throws actionable usage errors", () => {
   assert.throws(() => buildPayload("scan", []), /Usage: clawguard scan <skill-path>/);
   assert.throws(() => buildPayload("report", []), /Usage: clawguard report <slug>/);
   assert.throws(() => buildPayload("allow", []), /Usage: clawguard allow <slug> \[reason\]/);
+  assert.throws(() => buildPayload("block", []), /Usage: clawguard block <slug> \[reason\]/);
   assert.throws(() => buildPayload("detonate", []), /Usage: clawguard detonate <slug>/);
   assert.throws(() => buildPayload("unknown", []), /Unknown command: unknown/);
 });

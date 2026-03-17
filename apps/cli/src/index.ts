@@ -123,14 +123,41 @@ function formatSuccess(payload: DaemonRequestPayload, data: DaemonResponseData, 
 
       return lines.join("\n");
     }
-    case "report":
+    case "report": {
+      if (!("summary" in data)) {
+        return JSON.stringify(data, null, 2);
+      }
+
+      return formatReportResponse(data, detailed);
+    }
     case "allow":
     case "block": {
       if (!("summary" in data)) {
         return JSON.stringify(data, null, 2);
       }
 
-      return formatReportResponse(data, detailed);
+      const action = payload.command === "allow" ? "Allowed" : "Blocked";
+      const lines = [
+        `${action}: ${data.summary.slug}`,
+        `Verdict: ${data.summary.verdict}`,
+        `Score: ${data.summary.score}`,
+        `Findings: ${data.summary.findingCount}`,
+      ];
+
+      if (data.decision) {
+        lines.push(formatDecision(data.decision));
+      }
+
+      lines.push(`Summary: ${renderStaticSummary(data.report)}`);
+
+      if (detailed) {
+        lines.push("", renderStaticReport(data.report));
+        if (data.artifacts.length > 0) {
+          lines.push("", "Artifacts:", ...data.artifacts.map(formatArtifact));
+        }
+      }
+
+      return lines.join("\n");
     }
     case "audit": {
       if (!("scans" in data)) {
