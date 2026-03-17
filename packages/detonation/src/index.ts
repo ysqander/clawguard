@@ -19,8 +19,10 @@ export {
   type DetonationRuntimeProvider,
   type EnsureSandboxImageOptions,
   type EnsureSandboxImageResult,
+  type RunRuntimeCommandOptions,
   type RuntimeCommandExecutor,
   type RuntimeCommandResult,
+  RuntimeCommandTimeoutError,
 } from "./runtime-provider.js";
 export {
   defaultDetonationSandboxLayout,
@@ -32,6 +34,20 @@ export {
   type PreparedDetonationEnvironmentPaths,
   type RunSandboxCommandOptions,
 } from "./environment.js";
+export {
+  buildPromptRunnerPlan,
+  runPromptRunner,
+  type BuildPromptRunnerPlanOptions,
+  type PromptRunnerExecutionRecord,
+  type PromptRunnerExecutionStatus,
+  type PromptRunnerPlan,
+  type PromptRunnerPlanStep,
+  type PromptRunnerResult,
+  type PromptRunnerStepExecutor,
+  type PromptRunnerStepIntent,
+  type PromptRunnerStepType,
+  type RunPromptRunnerOptions,
+} from "./prompt-runner.js";
 
 const DEFAULT_TIMEOUT_SECONDS = 90;
 const DETONATION_BENCHMARK_PROMPTS = [

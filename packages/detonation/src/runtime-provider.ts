@@ -18,8 +18,30 @@ export interface RuntimeCommandResult {
   readonly stderr: string;
 }
 
+export interface RunRuntimeCommandOptions {
+  timeoutMs?: number;
+}
+
+export class RuntimeCommandTimeoutError extends Error {
+  readonly command: string;
+  readonly args: string[];
+  readonly timeoutMs: number;
+
+  constructor(command: string, args: string[], timeoutMs: number) {
+    super(`Command timed out after ${timeoutMs}ms: ${command} ${args.join(" ")}`.trim());
+    this.name = "RuntimeCommandTimeoutError";
+    this.command = command;
+    this.args = [...args];
+    this.timeoutMs = timeoutMs;
+  }
+}
+
 export interface RuntimeCommandExecutor {
-  run(command: string, args: string[]): Promise<RuntimeCommandResult>;
+  run(
+    command: string,
+    args: string[],
+    options?: RunRuntimeCommandOptions,
+  ): Promise<RuntimeCommandResult>;
 }
 
 export interface EnsureSandboxImageOptions {
@@ -40,7 +62,10 @@ export interface DetonationRuntimeProvider {
   readonly runtime: DetonationRuntimeKind;
   readonly command: string;
   ensureSandboxImage(options?: EnsureSandboxImageOptions): Promise<EnsureSandboxImageResult>;
-  runRuntimeCommand(args: string[]): Promise<RuntimeCommandResult>;
+  runRuntimeCommand(
+    args: string[],
+    options?: RunRuntimeCommandOptions,
+  ): Promise<RuntimeCommandResult>;
 }
 
 export interface CreateDetonationRuntimeProviderOptions {
@@ -51,7 +76,7 @@ export interface CreateDetonationRuntimeProviderOptions {
 
 export function createChildProcessRuntimeCommandExecutor(): RuntimeCommandExecutor {
   return {
-    async run(command, args) {
+    async run(command, args, options = {}) {
       return await new Promise<RuntimeCommandResult>((resolve, reject) => {
         const child = spawn(command, args, {
           stdio: "pipe",
@@ -59,6 +84,8 @@ export function createChildProcessRuntimeCommandExecutor(): RuntimeCommandExecut
 
         const stdoutChunks: Buffer[] = [];
         const stderrChunks: Buffer[] = [];
+        let timeoutId: NodeJS.Timeout | undefined;
+        let timeoutError: RuntimeCommandTimeoutError | undefined;
 
         child.stdout.on("data", (chunk) => {
           stdoutChunks.push(Buffer.from(chunk));
@@ -67,14 +94,33 @@ export function createChildProcessRuntimeCommandExecutor(): RuntimeCommandExecut
           stderrChunks.push(Buffer.from(chunk));
         });
 
-        child.on("error", reject);
+        child.on("error", (error) => {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          reject(error);
+        });
         child.on("close", (exitCode) => {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          if (timeoutError) {
+            reject(timeoutError);
+            return;
+          }
           resolve({
             exitCode: exitCode ?? 1,
             stdout: Buffer.concat(stdoutChunks).toString("utf8"),
             stderr: Buffer.concat(stderrChunks).toString("utf8"),
           });
         });
+
+        if (options.timeoutMs !== undefined) {
+          timeoutId = setTimeout(() => {
+            timeoutError = new RuntimeCommandTimeoutError(command, args, options.timeoutMs!);
+            child.kill("SIGKILL");
+          }, options.timeoutMs);
+        }
       });
     },
   };
@@ -151,8 +197,11 @@ class ContainerRuntimeProvider implements DetonationRuntimeProvider {
     };
   }
 
-  public async runRuntimeCommand(args: string[]): Promise<RuntimeCommandResult> {
-    return await this.commandExecutor.run(this.command, args);
+  public async runRuntimeCommand(
+    args: string[],
+    options?: RunRuntimeCommandOptions,
+  ): Promise<RuntimeCommandResult> {
+    return await this.commandExecutor.run(this.command, args, options);
   }
 
   private async imageExists(imageTag: string): Promise<boolean> {

@@ -9,6 +9,7 @@ import type { ContainerRuntimeDetector, DetectedContainerRuntime } from "@clawgu
 import {
   createChildProcessRuntimeCommandExecutor,
   createDetonationRuntimeProvider,
+  RuntimeCommandTimeoutError,
 } from "./index.js";
 
 function createRuntimeDetector(
@@ -129,6 +130,28 @@ test("createChildProcessRuntimeCommandExecutor rejects missing commands", async 
 
   await assert.rejects(() =>
     executor.run("/definitely/missing/clawguard-runtime-command", ["--version"]),
+  );
+});
+
+test("createChildProcessRuntimeCommandExecutor times out long-running commands", async () => {
+  const executor = createChildProcessRuntimeCommandExecutor();
+
+  await assert.rejects(
+    () =>
+      executor.run(
+        process.execPath,
+        [
+          "--input-type=module",
+          "--eval",
+          "setInterval(() => {}, 1000);",
+        ],
+        { timeoutMs: 50 },
+      ),
+    (error) => {
+      assert.ok(error instanceof RuntimeCommandTimeoutError);
+      assert.match(error.message, /timed out/u);
+      return true;
+    },
   );
 });
 

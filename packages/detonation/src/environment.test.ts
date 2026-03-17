@@ -33,7 +33,10 @@ test("prepareDetonationEnvironment creates the expected layout and baseline", as
   const environment = await prepareDetonationEnvironment(request);
 
   try {
-    assert.equal(environment.host.skillDir, path.join(environment.host.skillsDir, request.snapshot.slug));
+    assert.equal(
+      environment.host.skillDir,
+      path.join(environment.host.skillsDir, request.snapshot.slug),
+    );
     assert.equal(environment.container.configPath, defaultDetonationSandboxLayout.configPath);
 
     await assertPathExists(environment.host.configPath);
@@ -42,6 +45,7 @@ test("prepareDetonationEnvironment creates the expected layout and baseline", as
     await assertPathExists(environment.host.memoryFiles.user);
     await assertPathExists(environment.host.honeypots.envFile);
     await assertPathExists(environment.host.honeypots.sshKey);
+    await assertPathExists(environment.host.helpers.promptHarness);
     await assertPathExists(path.join(environment.host.skillDir, "SKILL.md"));
     await assertPathExists(path.join(environment.host.skillDir, "scripts", "install.sh"));
     await assertPathExists(environment.baseline.memoryFiles.memory);
@@ -82,7 +86,10 @@ test("prepareDetonationEnvironment is deterministic apart from the temp root", a
 
     const leftMemory = await readFile(left.host.memoryFiles.memory, "utf8");
     const rightMemory = await readFile(right.host.memoryFiles.memory, "utf8");
-    const leftScript = await readFile(path.join(left.host.skillDir, "scripts", "install.sh"), "utf8");
+    const leftScript = await readFile(
+      path.join(left.host.skillDir, "scripts", "install.sh"),
+      "utf8",
+    );
     const rightScript = await readFile(
       path.join(right.host.skillDir, "scripts", "install.sh"),
       "utf8",
@@ -228,6 +235,45 @@ test("runSandboxCommand preserves the baseline when memory files mutate", async 
 
     assert.equal(baselineText.includes("poisoned by smoke test"), false);
     assert.equal(liveText.includes("poisoned by smoke test"), true);
+  } finally {
+    await environment.cleanup();
+  }
+});
+
+test("runSandboxCommand forwards timeout options to the runtime provider", async () => {
+  const request = buildDetonationBenchmarkRequest("malicious-staged-download");
+  const environment = await prepareDetonationEnvironment(request);
+  let observedTimeoutMs: number | undefined;
+
+  try {
+    await runSandboxCommand(
+      {
+        runtime: "podman",
+        command: "podman",
+        async ensureSandboxImage() {
+          return {
+            runtime: "podman",
+            runtimeCommand: "podman",
+            imageTag: defaultSandboxImageTag,
+            source: "cache",
+          };
+        },
+        async runRuntimeCommand(_args, options) {
+          observedTimeoutMs = options?.timeoutMs;
+          return {
+            exitCode: 0,
+            stdout: "",
+            stderr: "",
+          };
+        },
+      },
+      environment,
+      "bash",
+      ["-lc", "true"],
+      { timeoutMs: 2500 },
+    );
+
+    assert.equal(observedTimeoutMs, 2500);
   } finally {
     await environment.cleanup();
   }

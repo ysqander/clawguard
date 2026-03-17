@@ -15,7 +15,11 @@ import path from "node:path";
 
 import type { DetonationRequest } from "@clawguard/contracts";
 
-import type { DetonationRuntimeProvider, RuntimeCommandResult } from "./runtime-provider.js";
+import type {
+  DetonationRuntimeProvider,
+  RunRuntimeCommandOptions,
+  RuntimeCommandResult,
+} from "./runtime-provider.js";
 
 const ENVIRONMENT_TEMP_PREFIX = "clawguard-detonation-environment-";
 
@@ -51,6 +55,133 @@ const HONEYPOT_SSH_KEY_TEXT = `-----BEGIN OPENSSH PRIVATE KEY-----
 ZmFrZS1vcGVuc3NoLXByaXZhdGUta2V5LWZvci1kZXRvbmF0aW9uLWhvbmV5cG90LW9u
 bHktZG8tbm90LXVzZS1mb3ItYXV0aGVudGljYXRpb24K
 -----END OPENSSH PRIVATE KEY-----
+`;
+
+const PROMPT_HARNESS_RELATIVE_PATH = ".clawguard/prompt-harness.mjs";
+const PROMPT_HARNESS_SOURCE = `import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+function parseArgs(argv) {
+  const parsed = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const key = argv[index];
+    const value = argv[index + 1];
+    if (!key || !key.startsWith("--")) {
+      continue;
+    }
+
+    if (value === undefined) {
+      throw new Error(\`Missing value for argument \${key}.\`);
+    }
+
+    parsed[key.slice(2)] = value;
+    index += 1;
+  }
+
+  if (typeof parsed.intent !== "string" || parsed.intent.length === 0) {
+    throw new Error("Missing --intent.");
+  }
+  if (typeof parsed.prompt !== "string" || parsed.prompt.length === 0) {
+    throw new Error("Missing --prompt.");
+  }
+  if (typeof parsed["skill-dir"] !== "string" || parsed["skill-dir"].length === 0) {
+    throw new Error("Missing --skill-dir.");
+  }
+
+  return {
+    intent: parsed.intent,
+    prompt: parsed.prompt,
+    skillDir: parsed["skill-dir"],
+    workflowCommand:
+      typeof parsed["workflow-command"] === "string" && parsed["workflow-command"].length > 0
+        ? parsed["workflow-command"]
+        : undefined,
+  };
+}
+
+function toShellLiteral(value) {
+  return \`'\${value.replaceAll("'", "'\\\\''")}'\`;
+}
+
+function extractSkillTitle(markdown) {
+  for (const line of markdown.split(/\\r?\\n/u)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("# ")) {
+      return trimmed.slice(2).trim();
+    }
+  }
+
+  return undefined;
+}
+
+async function runWorkflowCommand(skillDir, workflowCommand) {
+  return await new Promise((resolve, reject) => {
+    const child = spawn(
+      "bash",
+      ["-lc", \`cd \${toShellLiteral(skillDir)} && \${workflowCommand}\`],
+      {
+        stdio: "pipe",
+      },
+    );
+
+    const stdoutChunks = [];
+    const stderrChunks = [];
+
+    child.stdout.on("data", (chunk) => {
+      stdoutChunks.push(Buffer.from(chunk));
+    });
+    child.stderr.on("data", (chunk) => {
+      stderrChunks.push(Buffer.from(chunk));
+    });
+
+    child.on("error", reject);
+    child.on("close", (exitCode) => {
+      resolve({
+        exitCode: exitCode ?? 1,
+        stdout: Buffer.concat(stdoutChunks).toString("utf8"),
+        stderr: Buffer.concat(stderrChunks).toString("utf8"),
+      });
+    });
+  });
+}
+
+async function main() {
+  const parsed = parseArgs(process.argv.slice(2));
+  const skillMdPath = path.join(parsed.skillDir, "SKILL.md");
+
+  let skillMarkdown = "";
+  try {
+    skillMarkdown = await readFile(skillMdPath, "utf8");
+  } catch {}
+
+  const output = {
+    intent: parsed.intent,
+    prompt: parsed.prompt,
+    skillDir: parsed.skillDir,
+    skillMdPath,
+    skillMarkdownPresent: skillMarkdown.length > 0,
+    skillTitle: extractSkillTitle(skillMarkdown),
+    action: parsed.workflowCommand ? "workflow-command" : "noop",
+    ...(parsed.workflowCommand ? { workflowCommand: parsed.workflowCommand } : {}),
+  };
+
+  if (!parsed.workflowCommand) {
+    console.log(JSON.stringify(output));
+    return;
+  }
+
+  const workflowResult = await runWorkflowCommand(parsed.skillDir, parsed.workflowCommand);
+  console.log(
+    JSON.stringify({
+      ...output,
+      workflowResult,
+    }),
+  );
+  process.exit(workflowResult.exitCode);
+}
+
+await main();
 `;
 
 export interface DetonationSandboxLayout {
@@ -96,6 +227,9 @@ export interface PreparedDetonationEnvironmentPaths {
   workspaceDir: string;
   skillsDir: string;
   skillDir: string;
+  helpers: {
+    promptHarness: string;
+  };
   memoryFiles: {
     memory: string;
     soul: string;
@@ -118,13 +252,16 @@ export interface PreparedDetonationEnvironment {
     workspaceDir: string;
     skillsDir: string;
     skillDir: string;
+    helpers: {
+      promptHarness: string;
+    };
     memoryFiles: DetonationSandboxLayout["memoryFiles"];
     honeypots: DetonationSandboxLayout["honeypots"];
   };
   cleanup(): Promise<void>;
 }
 
-export interface RunSandboxCommandOptions {
+export interface RunSandboxCommandOptions extends RunRuntimeCommandOptions {
   imageTag?: string;
 }
 
@@ -141,6 +278,7 @@ export async function prepareDetonationEnvironment(
 
   await mkdir(path.dirname(host.configPath), { recursive: true });
   await mkdir(path.dirname(host.honeypots.sshKey), { recursive: true });
+  await mkdir(path.dirname(host.helpers.promptHarness), { recursive: true });
   await mkdir(host.skillsDir, { recursive: true });
 
   await writeFile(host.configPath, renderOpenClawConfig(defaultDetonationSandboxLayout), "utf8");
@@ -149,6 +287,7 @@ export async function prepareDetonationEnvironment(
   await writeFile(host.memoryFiles.user, USER_BASELINE_TEXT, "utf8");
   await writeFile(host.honeypots.envFile, HONEYPOT_ENV_TEXT, "utf8");
   await writeFile(host.honeypots.sshKey, HONEYPOT_SSH_KEY_TEXT, "utf8");
+  await writeFile(host.helpers.promptHarness, PROMPT_HARNESS_SOURCE, "utf8");
   await chmod(host.honeypots.sshKey, 0o600);
 
   await copySnapshotFiles(request, host.skillDir);
@@ -180,6 +319,12 @@ export async function prepareDetonationEnvironment(
       workspaceDir: defaultDetonationSandboxLayout.workspaceDir,
       skillsDir: defaultDetonationSandboxLayout.skillsDir,
       skillDir: path.posix.join(defaultDetonationSandboxLayout.skillsDir, request.snapshot.slug),
+      helpers: {
+        promptHarness: path.posix.join(
+          defaultDetonationSandboxLayout.workspaceDir,
+          PROMPT_HARNESS_RELATIVE_PATH,
+        ),
+      },
       memoryFiles: defaultDetonationSandboxLayout.memoryFiles,
       honeypots: defaultDetonationSandboxLayout.honeypots,
     },
@@ -212,10 +357,15 @@ export async function runSandboxCommand(
     image.imageTag,
     command,
     ...args,
-  ]);
+  ], {
+    ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+  });
 }
 
-async function copySnapshotFiles(request: DetonationRequest, destinationRoot: string): Promise<void> {
+async function copySnapshotFiles(
+  request: DetonationRequest,
+  destinationRoot: string,
+): Promise<void> {
   await mkdir(destinationRoot, { recursive: true });
 
   for (const relativePath of request.snapshot.fileInventory) {
@@ -254,6 +404,9 @@ function buildHostPaths(rootDir: string, slug: string): PreparedDetonationEnviro
     workspaceDir,
     skillsDir,
     skillDir: path.join(skillsDir, slug),
+    helpers: {
+      promptHarness: path.join(workspaceDir, PROMPT_HARNESS_RELATIVE_PATH),
+    },
     memoryFiles: {
       memory: path.join(workspaceDir, "MEMORY.md"),
       soul: path.join(workspaceDir, "SOUL.md"),
