@@ -1,31 +1,57 @@
 #!/usr/bin/env node
 
-import net from "node:net";
 import { randomUUID } from "node:crypto";
+import net from "node:net";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
 
 import {
   daemonResponseEnvelopeValidator,
   resolveDaemonSocketPath,
+  type ArtifactRef,
+  type DaemonErrorResponse,
   type DaemonRequestEnvelope,
   type DaemonRequestPayload,
+  type DaemonResponseData,
   type DaemonResponseEnvelope,
+  type DecisionRecord,
+  type ReportResponseData,
+  type ScanRecord,
 } from "@clawguard/contracts";
+import { renderStaticReport, renderStaticSummary } from "@clawguard/reports";
 
-async function main(): Promise<void> {
-  const [, , command = "status", ...rest] = process.argv;
-  const payload = buildPayload(command, rest);
-  const response = await sendDaemonRequest(payload);
+export async function main(argv = process.argv): Promise<void> {
+  const args = argv.slice(2);
+  const command = args[0] ?? "status";
+  const commandArgs = args.slice(1);
+  const detailed = commandArgs.includes("--detailed");
 
-  if (!response.ok) {
-    console.error(`error (${response.error.code}): ${response.error.message}`);
+  if (command === "help" || command === "--help" || command === "-h") {
+    console.log(getHelpText());
+    return;
+  }
+
+  const payload = buildPayload(command, commandArgs.filter((arg) => arg !== "--detailed"));
+
+  let response: DaemonResponseEnvelope;
+  try {
+    response = await sendDaemonRequest(payload);
+  } catch (error) {
+    console.error(formatConnectionError(error));
     process.exitCode = 1;
     return;
   }
 
-  console.log(JSON.stringify(response.data, null, 2));
+  if (!response.ok) {
+    console.error(formatDaemonError(payload, response));
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(formatSuccess(payload, response.data, detailed));
 }
 
-function buildPayload(command: string, args: string[]): DaemonRequestPayload {
+export function buildPayload(command: string, args: string[]): DaemonRequestPayload {
   switch (command) {
     case "status":
       return { command: "status" };
@@ -70,6 +96,147 @@ function buildPayload(command: string, args: string[]): DaemonRequestPayload {
   }
 }
 
+function formatSuccess(payload: DaemonRequestPayload, data: DaemonResponseData, detailed: boolean): string {
+  switch (payload.command) {
+    case "status": {
+      if (!("state" in data)) {
+        return JSON.stringify(data, null, 2);
+      }
+
+      return ["ClawGuard daemon status", `- State: ${data.state}`, `- Active jobs: ${data.jobs}`].join("\n");
+    }
+    case "scan": {
+      if (!("scan" in data)) {
+        return JSON.stringify(data, null, 2);
+      }
+
+      const lines = [`Scan completed for ${data.scan.slug}`, formatScanMetadata(data.scan)];
+
+      if (data.report) {
+        lines.push(`Recommendation: ${data.report.recommendation}`);
+        lines.push(`Summary: ${renderStaticSummary(data.report)}`);
+
+        if (detailed) {
+          lines.push("", renderStaticReport(data.report));
+        }
+      }
+
+      return lines.join("\n");
+    }
+    case "report":
+    case "allow":
+    case "block": {
+      if (!("summary" in data)) {
+        return JSON.stringify(data, null, 2);
+      }
+
+      return formatReportResponse(data, detailed);
+    }
+    case "audit": {
+      if (!("scans" in data)) {
+        return JSON.stringify(data, null, 2);
+      }
+
+      if (data.scans.length === 0) {
+        return "No scans recorded yet.";
+      }
+
+      return [
+        "Recent scans",
+        ...data.scans.map(
+          (scan) => `- ${scan.slug} (${scan.status}) ${scan.startedAt} [scanId=${scan.scanId}]`,
+        ),
+      ].join("\n");
+    }
+    case "detonate":
+      return JSON.stringify(data, null, 2);
+  }
+}
+
+function formatReportResponse(data: ReportResponseData, detailed: boolean): string {
+  const lines = [
+    `Report for ${data.summary.slug}`,
+    `Verdict: ${data.summary.verdict}`,
+    `Score: ${data.summary.score}`,
+    `Findings: ${data.summary.findingCount}`,
+  ];
+
+  if (data.decision) {
+    lines.push(formatDecision(data.decision));
+  }
+
+  lines.push(`Summary: ${renderStaticSummary(data.report)}`);
+
+  if (detailed) {
+    lines.push("");
+    lines.push(renderStaticReport(data.report));
+    if (data.artifacts.length > 0) {
+      lines.push("", "Artifacts:", ...data.artifacts.map(formatArtifact));
+    }
+  }
+
+  return lines.join("\n");
+}
+
+function formatConnectionError(error: unknown): string {
+  const socketPath = resolveDaemonSocketPath();
+
+  if (
+    error instanceof Error &&
+    "code" in error &&
+    (error.code === "ENOENT" || error.code === "ECONNREFUSED")
+  ) {
+    return [
+      `Unable to connect to ClawGuard daemon at ${socketPath}.`,
+      "Start the daemon first: node apps/daemon/dist/index.js",
+      "Then retry your command.",
+    ].join("\n");
+  }
+
+  return error instanceof Error ? error.message : "Unknown CLI failure";
+}
+
+function formatDaemonError(payload: DaemonRequestPayload, response: DaemonErrorResponse): string {
+  if (payload.command === "detonate" && response.error.code === "not_implemented") {
+    return [
+      "Detonation orchestration is not available yet (planned for Milestone B).",
+      "You can still run static-path triage now:",
+      "- clawguard scan <skill-path>",
+      `- clawguard report ${payload.slug}`,
+      "Use allow/block to resolve quarantine decisions after review.",
+    ].join("\n");
+  }
+
+  return `error (${response.error.code}): ${response.error.message}`;
+}
+
+function formatScanMetadata(scan: ScanRecord): string {
+  return `Scan ${scan.scanId} started ${scan.startedAt}${scan.completedAt ? ` and completed ${scan.completedAt}` : ""}.`;
+}
+
+function formatDecision(decision: DecisionRecord): string {
+  return `Operator decision: ${decision.decision} (${decision.reason}) at ${decision.createdAt}`;
+}
+
+function formatArtifact(artifact: ArtifactRef): string {
+  return `- [${artifact.type}] ${artifact.path}`;
+}
+
+function getHelpText(): string {
+  return [
+    "ClawGuard CLI",
+    "",
+    "Commands:",
+    "  clawguard status",
+    "  clawguard audit",
+    "  clawguard scan <skill-path> [--detailed]",
+    "  clawguard report <slug> [--detailed]",
+    "  clawguard allow <slug> [reason] [--detailed]",
+    "  clawguard block <slug> [reason] [--detailed]",
+    "  clawguard detonate <slug>",
+  ].join("\n");
+}
+
 async function sendDaemonRequest(payload: DaemonRequestPayload): Promise<DaemonResponseEnvelope> {
   const request: DaemonRequestEnvelope = {
     version: 1,
@@ -110,4 +277,8 @@ async function sendDaemonRequest(payload: DaemonRequestPayload): Promise<DaemonR
   });
 }
 
-await main();
+const isEntrypoint = process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isEntrypoint) {
+  await main();
+}

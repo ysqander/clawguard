@@ -10,13 +10,11 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-16, the repo has landed the main code and documentation for `CG-001` through `CG-015`, plus `CG-017`.
+As of 2026-03-16, the repo has landed the main code and documentation for `CG-001` through `CG-015`, plus `CG-017` and `CG-018`.
 
 `CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness, but full detonation execution benchmarking remains blocked on `CG-016`.
 
-The next unfinished Milestone A ticket now starts with:
-
-- `CG-018`: CLI commands and output formatting
+Milestone A static-path coverage is complete after `CG-018` landed.
 
 The next unfinished Milestone B tickets now start with:
 
@@ -368,6 +366,7 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-007`, `CG-012`, `CG-017`
+Status: `Complete`
 
 Scope:
 
@@ -465,18 +464,18 @@ Acceptance criteria:
 
 Immediate next tickets:
 
-- `CG-018`
 - `CG-016`
+- `CG-021`
 
 Current recommended parallel work:
 
-- `CG-018` to close Milestone A with operator-ready CLI coverage on top of the completed daemon/static/reporting flow
-- `CG-016` on the isolated detonation package boundary, in parallel with `CG-018`
-- optional prep-only slicing of `CG-019` for notification and service wiring once `CG-018` command and output shapes are stable
+- `CG-016` on the detonation package boundary for telemetry capture, artifact persistence, and enrichment
+- `CG-021` to expand end-to-end regression coverage after `CG-016` lands
+- optional prep-only slicing of `CG-019` for notification and service wiring while detonation/validation work completes
 
 Remaining Static MVP critical path:
 
-- `CG-018`
+- None (`CG-018` completed)
 
 Behavioral MVP critical path:
 
@@ -484,8 +483,8 @@ Behavioral MVP critical path:
 
 Tickets that should wait for dependencies to settle:
 
-- `CG-019` until `CG-018` lands, unless it is explicitly split into prep-only wiring work
-- `CG-021` until both `CG-016` and `CG-018` land
+- `CG-019` until `CG-016` and `CG-021` stabilize notification/service output surfaces
+- `CG-022` until `CG-021` lands and validation outputs are stable
 
 Launch candidate closeout:
 
