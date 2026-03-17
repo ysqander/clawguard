@@ -466,13 +466,12 @@ Acceptance criteria:
 Immediate next tickets:
 
 - `CG-018`
-- `CG-015`
 - `CG-016`
 
 Current recommended parallel work:
 
 - `CG-018` to close Milestone A with operator-ready CLI coverage on top of the completed daemon/static/reporting flow
-- `CG-015` on the isolated detonation package boundary, in parallel with `CG-018`
+- `CG-016` on the isolated detonation package boundary, in parallel with `CG-018`
 - optional prep-only slicing of `CG-019` for notification and service wiring once `CG-018` command and output shapes are stable
 
 Remaining Static MVP critical path:
@@ -481,7 +480,7 @@ Remaining Static MVP critical path:
 
 Behavioral MVP critical path:
 
-- `CG-015` -> `CG-016` -> `CG-021`
+- `CG-016` -> `CG-021`
 
 Tickets that should wait for dependencies to settle:
 
