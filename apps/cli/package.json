@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@clawguard/contracts": "workspace:*",
+    "@clawguard/platform": "workspace:*",
     "@clawguard/reports": "workspace:*",
     "@clawguard/scanner": "workspace:*"
   }

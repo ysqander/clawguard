@@ -41,11 +41,19 @@ export interface SkillWatcherPipelineErrorContext {
   skillPath?: string;
 }
 
+export interface SkillWatcherPipelineWatchContext {
+  skillRootPath: string;
+  skillRootKind: DiscoveredSkillRoot["kind"];
+  discoverySource: DiscoveredSkillRoot["source"];
+  workspaceId?: string;
+}
+
 export interface SkillWatcherPipelineOptions {
   workspaceModel: OpenClawWorkspaceModel;
   watcher: FileWatcher;
   onScanScheduled(scan: ScheduledSkillScan): void | Promise<void>;
   onRootRescanRequested(request: ScheduledRootRescan): void | Promise<void>;
+  onWatchActivated?(context: SkillWatcherPipelineWatchContext): void | Promise<void>;
   onError(error: Error, context: SkillWatcherPipelineErrorContext): void | Promise<void>;
   debounceMs?: number;
   retryDelayMs?: number;
@@ -148,6 +156,12 @@ export class SkillWatcherPipeline {
     try {
       state.subscription = await this.options.watcher.watchDirectory(state.root.path, handlers, {
         recursive: true,
+      });
+      await this.reportWatchActivated({
+        skillRootPath: state.root.path,
+        skillRootKind: state.root.kind,
+        discoverySource: state.root.source,
+        ...(state.root.workspaceId !== undefined ? { workspaceId: state.root.workspaceId } : {}),
       });
     } catch (error) {
       await this.reportError(error, {
@@ -328,6 +342,16 @@ export class SkillWatcherPipeline {
         error instanceof Error ? error : new Error(String(error)),
         context,
       );
+    } catch {}
+  }
+
+  private async reportWatchActivated(context: SkillWatcherPipelineWatchContext): Promise<void> {
+    if (!this.options.onWatchActivated) {
+      return;
+    }
+
+    try {
+      await this.options.onWatchActivated(context);
     } catch {}
   }
 }

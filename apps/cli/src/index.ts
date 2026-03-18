@@ -18,7 +18,27 @@ import {
   type ReportResponseData,
   type ScanRecord,
 } from "@clawguard/contracts";
+import { createPlatformAdapter } from "@clawguard/platform";
 import { renderStaticReport, renderStaticSummary } from "@clawguard/reports";
+
+import {
+  formatServiceCommandResult,
+  getDaemonServiceStatus,
+  installDaemonService,
+  uninstallDaemonService,
+} from "./service-commands.js";
+
+type ServiceCommandAction = "install" | "status" | "uninstall";
+
+type CliCommand =
+  | {
+      kind: "daemon";
+      payload: DaemonRequestPayload;
+    }
+  | {
+      kind: "service";
+      action: ServiceCommandAction;
+    };
 
 export async function main(argv = process.argv): Promise<void> {
   const args = argv.slice(2);
@@ -31,7 +51,19 @@ export async function main(argv = process.argv): Promise<void> {
     return;
   }
 
-  const payload = buildPayload(command, commandArgs.filter((arg) => arg !== "--detailed"));
+  const resolvedCommand = buildCommand(command, commandArgs.filter((arg) => arg !== "--detailed"));
+
+  if (resolvedCommand.kind === "service") {
+    try {
+      console.log(await runServiceCommand(resolvedCommand.action));
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : "Unknown service command failure");
+      process.exitCode = 1;
+    }
+    return;
+  }
+
+  const payload = resolvedCommand.payload;
 
   let response: DaemonResponseEnvelope;
   try {
@@ -49,6 +81,20 @@ export async function main(argv = process.argv): Promise<void> {
   }
 
   console.log(formatSuccess(payload, response.data, detailed));
+}
+
+export function buildCommand(command: string, args: string[]): CliCommand {
+  if (command === "service") {
+    return {
+      kind: "service",
+      action: buildServiceAction(args),
+    };
+  }
+
+  return {
+    kind: "daemon",
+    payload: buildPayload(command, args),
+  };
 }
 
 export function buildPayload(command: string, args: string[]): DaemonRequestPayload {
@@ -96,14 +142,32 @@ export function buildPayload(command: string, args: string[]): DaemonRequestPayl
   }
 }
 
-function formatSuccess(payload: DaemonRequestPayload, data: DaemonResponseData, detailed: boolean): string {
+export function formatSuccess(
+  payload: DaemonRequestPayload,
+  data: DaemonResponseData,
+  detailed: boolean,
+): string {
   switch (payload.command) {
     case "status": {
       if (!("state" in data)) {
         return JSON.stringify(data, null, 2);
       }
 
-      return ["ClawGuard daemon status", `- State: ${data.state}`, `- Active jobs: ${data.jobs}`].join("\n");
+      const lines = [
+        "ClawGuard daemon status",
+        `- State: ${data.state}`,
+        `- Active jobs: ${data.jobs}`,
+      ];
+
+      if (data.watcher !== undefined) {
+        lines.push(`- Watcher: ${data.watcher}`);
+      }
+
+      if (data.issues !== undefined && data.issues.length > 0) {
+        lines.push(...data.issues.map((issue) => `- Issue: ${issue}`));
+      }
+
+      return lines.join("\n");
     }
     case "scan": {
       if (!("scan" in data)) {
@@ -261,7 +325,38 @@ function getHelpText(): string {
     "  clawguard allow <slug> [reason] [--detailed]",
     "  clawguard block <slug> [reason] [--detailed]",
     "  clawguard detonate <slug>",
+    "  clawguard service install",
+    "  clawguard service status",
+    "  clawguard service uninstall",
   ].join("\n");
+}
+
+function buildServiceAction(args: string[]): ServiceCommandAction {
+  const action = args[0];
+  if (action === "install" || action === "status" || action === "uninstall") {
+    return action;
+  }
+
+  throw new Error("Usage: clawguard service <install|status|uninstall>");
+}
+
+async function runServiceCommand(action: ServiceCommandAction): Promise<string> {
+  const platform = createPlatformAdapter();
+
+  if (!platform.capabilities.supportsServiceInstall) {
+    throw new Error(`Service management is not supported on ${platform.capabilities.platform}.`);
+  }
+
+  const client = { services: platform.services };
+
+  switch (action) {
+    case "install":
+      return formatServiceCommandResult(await installDaemonService(client));
+    case "status":
+      return formatServiceCommandResult(await getDaemonServiceStatus(client));
+    case "uninstall":
+      return formatServiceCommandResult(await uninstallDaemonService(client));
+  }
 }
 
 async function sendDaemonRequest(payload: DaemonRequestPayload): Promise<DaemonResponseEnvelope> {

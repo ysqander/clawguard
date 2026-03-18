@@ -342,6 +342,7 @@ export {
   type ScheduledRootRescan,
   SkillWatcherPipeline,
   type SkillWatcherPipelineErrorContext,
+  type SkillWatcherPipelineWatchContext,
   resolveSkillPathFromEvent,
   type ScheduledSkillScan,
   type SkillWatcherPipelineOptions,

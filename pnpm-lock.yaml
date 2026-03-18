@@ -23,6 +23,9 @@ importers:
       '@clawguard/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@clawguard/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
       '@clawguard/reports':
         specifier: workspace:*
         version: link:../../packages/reports

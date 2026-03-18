@@ -19,15 +19,20 @@ import {
   buildSkillSnapshot,
   discoverOpenClawWorkspaceModel,
   SkillWatcherPipeline,
+  type SkillWatcherPipelineErrorContext,
+  type SkillWatcherPipelineWatchContext,
 } from "@clawguard/discovery";
 import { createPlatformAdapter, type PlatformAdapter } from "@clawguard/platform";
 import { persistSynthesizedStaticReport, synthesizeStaticReport } from "@clawguard/reports";
 import { scanSkillSnapshot } from "@clawguard/scanner";
 import { createStorage, type StoragePaths, type StoredStaticReport } from "@clawguard/storage";
 
+import { buildScanNotification, type ScanRecommendation } from "./notifications.js";
+
 const MAX_QUEUE_DEPTH = 64;
 const SCAN_RETRY_LIMIT = 2;
 const RETRY_DELAY_MS = 150;
+const MAX_WARNING_ISSUES = 10;
 
 interface ScanJobResult {
   scan: ScanRecord;
@@ -63,6 +68,9 @@ export class DaemonServer {
   private readonly workspaceModel: OpenClawWorkspaceModel | undefined;
   private readonly watcherDebounceMs: number | undefined;
   private readonly watcherRetryDelayMs: number | undefined;
+  private readonly watcherIssuesByRoot = new Map<string, string>();
+  private readonly warningIssues: string[] = [];
+  private watcherStartupIssue: string | undefined;
   private watcherPipeline: SkillWatcherPipeline | undefined;
   private queueRunning = false;
 
@@ -134,6 +142,7 @@ export class DaemonServer {
     }
 
     try {
+      this.watcherStartupIssue = undefined;
       const workspaceModel = this.workspaceModel ?? (await discoverOpenClawWorkspaceModel());
       this.watcherPipeline = new SkillWatcherPipeline({
         workspaceModel,
@@ -144,15 +153,21 @@ export class DaemonServer {
         onRootRescanRequested: async () => {
           // Root rescans are advisory; watcher event granularity already provides skill-level scans.
         },
-        onError: async () => {
-          // Surface watcher errors via daemon status degradation in later tickets.
+        onWatchActivated: async (context) => {
+          this.clearWatcherIssue(context);
+        },
+        onError: async (error, context) => {
+          this.recordWatcherIssue(error, context);
         },
         ...(this.watcherDebounceMs !== undefined ? { debounceMs: this.watcherDebounceMs } : {}),
         ...(this.watcherRetryDelayMs !== undefined ? { retryDelayMs: this.watcherRetryDelayMs } : {}),
       });
       await this.watcherPipeline.start();
-    } catch {
+    } catch (error) {
       this.watcherPipeline = undefined;
+      this.recordWatcherStartupIssue(
+        `Watcher startup failed: ${error instanceof Error ? error.message : "unknown error"}`,
+      );
     }
   }
 
@@ -179,10 +194,7 @@ export class DaemonServer {
     try {
       switch (request.payload.command) {
         case "status":
-          return this.successResponse(request.requestId, {
-            state: this.scanQueue.length > 0 || this.inflightScanByKey.size > 0 ? "busy" : "idle",
-            jobs: this.scanQueue.length + this.inflightScanByKey.size,
-          });
+          return this.successResponse(request.requestId, this.buildStatusResponse());
         case "scan": {
           const result = await this.enqueueScan(request.payload.skillPath, request.payload.skillPath);
           return this.successResponse(request.requestId, {
@@ -365,6 +377,7 @@ export class DaemonServer {
       contentHash: scanReport.snapshot.contentHash,
       recommendation: scanReport.recommendation,
     });
+    await this.sendScanNotification(persisted.storedReport.report);
 
     return {
       scan,
@@ -379,6 +392,90 @@ export class DaemonServer {
       ...(report.decision ? { decision: report.decision } : {}),
       artifacts: report.artifacts,
     };
+  }
+
+  private buildStatusResponse(): DaemonSuccessResponse["data"] {
+    const jobs = this.scanQueue.length + this.inflightScanByKey.size;
+    const watcher = this.getWatcherState();
+    const degraded = watcher === "degraded";
+    const issues = this.getActiveIssues();
+
+    return {
+      state: degraded ? "degraded" : jobs > 0 ? "busy" : "idle",
+      jobs,
+      watcher,
+      issues,
+    };
+  }
+
+  private getWatcherState(): "disabled" | "running" | "degraded" {
+    if (!this.startWatcher) {
+      return "disabled";
+    }
+
+    if (this.watcherStartupIssue !== undefined || this.watcherIssuesByRoot.size > 0) {
+      return "degraded";
+    }
+
+    return "running";
+  }
+
+  private recordWatcherIssue(error: Error, context: SkillWatcherPipelineErrorContext): void {
+    const message = `Watcher ${context.phase} failed for ${context.skillRootPath}: ${error.message}`;
+
+    if (context.phase === "watch-start" || context.phase === "watch-runtime") {
+      this.watcherIssuesByRoot.set(context.skillRootPath, message);
+      return;
+    }
+
+    this.recordWarningIssue(message);
+  }
+
+  private clearWatcherIssue(context: SkillWatcherPipelineWatchContext): void {
+    this.watcherIssuesByRoot.delete(context.skillRootPath);
+  }
+
+  private recordWatcherStartupIssue(message: string): void {
+    this.watcherStartupIssue = message;
+  }
+
+  private recordWarningIssue(message: string): void {
+    this.warningIssues.push(message);
+    if (this.warningIssues.length > MAX_WARNING_ISSUES) {
+      this.warningIssues.shift();
+    }
+  }
+
+  private getActiveIssues(): string[] {
+    return [
+      ...(this.watcherStartupIssue !== undefined ? [this.watcherStartupIssue] : []),
+      ...this.watcherIssuesByRoot.values(),
+      ...this.warningIssues,
+    ];
+  }
+
+  private async sendScanNotification(report: StaticScanReport): Promise<void> {
+    if (!this.platform?.capabilities.supportsNotifications) {
+      return;
+    }
+
+    try {
+      await this.platform.notifications.send(
+        buildScanNotification({
+          slug: report.snapshot.slug,
+          recommendation: toNotificationRecommendation(report.recommendation),
+          score: report.score,
+          findingCount: report.findings.length,
+          completedAt: report.generatedAt,
+        }),
+      );
+    } catch (error) {
+      this.recordWarningIssue(
+        `Notification delivery failed for ${report.snapshot.slug}: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`,
+      );
+    }
   }
 
   private successResponse(
@@ -441,4 +538,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const daemon = new DaemonServer();
   await daemon.start();
   console.log(`clawguard daemon listening on ${daemon.getSocketPath()}`);
+}
+
+function toNotificationRecommendation(
+  recommendation: StaticScanReport["recommendation"],
+): ScanRecommendation {
+  switch (recommendation) {
+    case "allow":
+    case "review":
+    case "block":
+      return recommendation;
+    case "unknown":
+      return "review";
+  }
 }

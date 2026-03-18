@@ -85,6 +85,8 @@ export interface DaemonRequestEnvelope {
 export interface StatusResponseData {
   state: "idle" | "busy" | "degraded";
   jobs: number;
+  watcher?: "disabled" | "running" | "degraded";
+  issues?: string[];
 }
 
 export interface ScanResponseData {
@@ -190,10 +192,21 @@ function parseDaemonRequestEnvelope(input: unknown, path: string): DaemonRequest
 }
 
 function parseStatusResponseData(input: unknown, path: string): StatusResponseData {
-  return parseObject(input, path, (record) => ({
-    state: parseEnum(record.state, ["idle", "busy", "degraded"] as const, `${path}.state`),
-    jobs: parseInteger(record.jobs, `${path}.jobs`),
-  }));
+  return parseObject(input, path, (record) => {
+    const watcher = parseOptional(
+      record.watcher,
+      (value, valuePath) => parseEnum(value, ["disabled", "running", "degraded"] as const, valuePath),
+      `${path}.watcher`,
+    );
+    const issues = parseOptional(record.issues, parseArrayOfNonEmptyStrings, `${path}.issues`);
+
+    return {
+      state: parseEnum(record.state, ["idle", "busy", "degraded"] as const, `${path}.state`),
+      jobs: parseInteger(record.jobs, `${path}.jobs`),
+      ...(watcher !== undefined ? { watcher } : {}),
+      ...(issues !== undefined ? { issues } : {}),
+    };
+  });
 }
 
 function parseScanResponseData(input: unknown, path: string): ScanResponseData {
@@ -268,6 +281,10 @@ function parseDaemonError(input: unknown, path: string): DaemonError {
     message: parseNonEmptyString(record.message, `${path}.message`),
     retryable: parseBoolean(record.retryable, `${path}.retryable`),
   }));
+}
+
+function parseArrayOfNonEmptyStrings(input: unknown, path: string): string[] {
+  return parseArray(input, parseNonEmptyString, path);
 }
 
 function parseDaemonResponseEnvelope(input: unknown, path: string): DaemonResponseEnvelope {

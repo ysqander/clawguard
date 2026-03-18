@@ -186,7 +186,9 @@ When `ok: true`, the daemon returns a `data` object. Its shape depends on the re
 ```ts
 {
   state: "idle" | "busy" | "degraded",
-  jobs: 0
+  jobs: 0,
+  watcher?: "disabled" | "running" | "degraded",
+  issues?: string[]
 }
 ```
 
@@ -196,6 +198,15 @@ Meaning:
   - daemon health and activity summary
 - `jobs`
   - current number of queued/running jobs
+- `watcher`
+  - optional watcher health details returned by newer daemons
+- `issues`
+  - optional active watcher faults and recent warning messages returned by newer daemons
+
+Compatibility note:
+
+- IPC version `1` still accepts older daemon responses that only include `state` and `jobs`.
+- Newer daemons include `watcher` and `issues`, but the CLI must tolerate them being absent during rolling upgrades.
 
 ### `scan` response
 

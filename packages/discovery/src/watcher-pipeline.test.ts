@@ -78,6 +78,7 @@ test("watches all discovered roots and recovers after transient watch failures",
   const scheduled: string[] = [];
   const rootRescans: string[] = [];
   const errors: SkillWatcherPipelineErrorContext[] = [];
+  const activated: string[] = [];
 
   const pipeline = new SkillWatcherPipeline({
     workspaceModel: buildWorkspaceModel(),
@@ -89,6 +90,9 @@ test("watches all discovered roots and recovers after transient watch failures",
     },
     onRootRescanRequested(request) {
       rootRescans.push(request.skillRootPath);
+    },
+    onWatchActivated(context) {
+      activated.push(context.skillRootPath);
     },
     onError(_error, context) {
       errors.push(context);
@@ -113,6 +117,13 @@ test("watches all discovered roots and recovers after transient watch failures",
     "/tmp/managed-skills=>clock",
   ]);
   assert.deepEqual(rootRescans, ["/tmp/extra-skills"]);
+  assert.deepEqual(activated.sort(), [
+    "/tmp/extra-skills",
+    "/tmp/extra-skills",
+    "/tmp/fallback-skills",
+    "/tmp/managed-skills",
+    "/tmp/workspace/skills",
+  ]);
   assert.deepEqual(errors.map((error) => error.phase).sort(), ["watch-runtime", "watch-start"]);
 
   await pipeline.stop();
