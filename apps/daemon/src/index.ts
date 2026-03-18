@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   daemonRequestEnvelopeValidator,
   resolveDaemonSocketPath,
+  type OpenClawWorkspaceModel,
   type ScanRecord,
   type StaticScanReport,
   type DaemonErrorResponse,
@@ -44,6 +45,10 @@ export interface StartDaemonOptions {
   socketPath?: string;
   storagePaths?: Partial<StoragePaths>;
   startWatcher?: boolean;
+  platformAdapter?: PlatformAdapter;
+  workspaceModel?: OpenClawWorkspaceModel;
+  watcherDebounceMs?: number;
+  watcherRetryDelayMs?: number;
 }
 
 export class DaemonServer {
@@ -55,6 +60,9 @@ export class DaemonServer {
   private readonly inflightScanByKey = new Map<string, Promise<ScanJobResult>>();
   private readonly startWatcher: boolean;
   private readonly platform: PlatformAdapter | undefined;
+  private readonly workspaceModel: OpenClawWorkspaceModel | undefined;
+  private readonly watcherDebounceMs: number | undefined;
+  private readonly watcherRetryDelayMs: number | undefined;
   private watcherPipeline: SkillWatcherPipeline | undefined;
   private queueRunning = false;
 
@@ -63,7 +71,10 @@ export class DaemonServer {
     this.startWatcher = options.startWatcher ?? true;
     this.storage = createStorage(options.storagePaths);
     this.lifecycle = new SkillLifecycleManager({ storage: this.storage });
-    this.platform = this.startWatcher ? createPlatformAdapter() : undefined;
+    this.platform = this.startWatcher ? (options.platformAdapter ?? createPlatformAdapter()) : undefined;
+    this.workspaceModel = options.workspaceModel;
+    this.watcherDebounceMs = options.watcherDebounceMs;
+    this.watcherRetryDelayMs = options.watcherRetryDelayMs;
     this.server = net.createServer((socket) => {
       let buffer = "";
       socket.setEncoding("utf8");
@@ -123,7 +134,7 @@ export class DaemonServer {
     }
 
     try {
-      const workspaceModel = await discoverOpenClawWorkspaceModel();
+      const workspaceModel = this.workspaceModel ?? (await discoverOpenClawWorkspaceModel());
       this.watcherPipeline = new SkillWatcherPipeline({
         workspaceModel,
         watcher: this.platform.watcher,
@@ -136,6 +147,8 @@ export class DaemonServer {
         onError: async () => {
           // Surface watcher errors via daemon status degradation in later tickets.
         },
+        ...(this.watcherDebounceMs !== undefined ? { debounceMs: this.watcherDebounceMs } : {}),
+        ...(this.watcherRetryDelayMs !== undefined ? { retryDelayMs: this.watcherRetryDelayMs } : {}),
       });
       await this.watcherPipeline.start();
     } catch {

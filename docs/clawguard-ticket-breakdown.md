@@ -10,17 +10,19 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-16, the repo has landed the main code and documentation for `CG-001` through `CG-018`.
+As of 2026-03-17, the repo has landed the main code and documentation for `CG-001` through `CG-021`.
 
-`CG-020` now covers the reusable fixture corpus, gated static benchmark harness, and detonation preflight harness. Full detonation execution benchmarking can now proceed on top of the completed `CG-016` telemetry work.
+`CG-020` now covers the reusable fixture corpus plus gated static and full detonation benchmark harnesses.
 
 Milestone A static-path coverage is complete after `CG-018` landed.
 
-The next unfinished Milestone B tickets now start with:
+Milestone B behavioral validation coverage is complete after `CG-021` landed.
 
-- `CG-021`: end-to-end regression and security validation
+The next unfinished launch tickets now start with:
 
-`CG-020` remains partially complete until detonation execution benchmarking lands, but its current fixture corpus and static benchmarking outputs are sufficient to support `CG-021` and the detonation runtime work.
+- `CG-019`: macOS notifications and launchd service setup
+
+`CG-022` remains blocked on the final packaging/docs pass after `CG-019`.
 
 ## Epic A: Monorepo Foundation
 
@@ -388,6 +390,7 @@ Acceptance criteria:
 Priority: `P1`
 Milestone: `C`
 Depends on: `CG-004`, `CG-017`, `CG-018`
+Status: `Next`
 
 Scope:
 
@@ -408,6 +411,7 @@ Acceptance criteria:
 Priority: `P0`
 Milestone: `A`
 Depends on: `CG-001`
+Status: `Complete`
 
 Scope:
 
@@ -421,15 +425,12 @@ Acceptance criteria:
 - Static benchmark output is automated in a gated local workflow.
 - Fixture coverage includes high-quality benign skills to track false positives.
 
-Note:
-
-- Full detonation execution benchmarking is no longer blocked on `CG-016`; the current repo still only includes a detonation runtime-readiness preflight harness and needs the benchmark work itself.
-
 ### CG-021 Implement end-to-end regression and security validation
 
 Priority: `P1`
 Milestone: `B`
 Depends on: `CG-016`, `CG-017`, `CG-018`, `CG-020`
+Status: `Complete`
 
 Scope:
 
@@ -465,12 +466,12 @@ Acceptance criteria:
 
 Immediate next tickets:
 
-- `CG-021`
+- `CG-019`
 
 Current recommended parallel work:
 
-- `CG-021` to expand end-to-end regression coverage on top of the completed detonation telemetry work
-- optional prep-only slicing of `CG-019` for notification and service wiring while detonation/validation work completes
+- `CG-019` for notification delivery, daemon health surfacing, and `launchd` install flows
+- optional prep-only slicing of `CG-022` for doc structure while service wiring settles
 
 Remaining Static MVP critical path:
 
@@ -478,12 +479,11 @@ Remaining Static MVP critical path:
 
 Behavioral MVP critical path:
 
-- `CG-021`
+- None (`CG-021` completed)
 
 Tickets that should wait for dependencies to settle:
 
-- `CG-019` until `CG-016` and `CG-021` stabilize notification/service output surfaces
-- `CG-022` until `CG-021` lands and validation outputs are stable
+- `CG-022` until `CG-019` lands and service/notification output surfaces are stable
 
 Launch candidate closeout:
 
