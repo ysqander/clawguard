@@ -2,6 +2,8 @@
 
 ClawGuard is a local-first skill auditor for OpenClaw agents. This repository is structured as a `pnpm` monorepo from day one so the scanner, daemon, detonation runtime, reporting pipeline, and platform adapters can evolve independently without collapsing into one package.
 
+ClawGuard answers "should this skill be present on the machine?" It does not act as a runtime tool-call authorization layer.
+
 ## Workspace layout
 
 - `apps/cli`: user-facing `clawguard` commands
@@ -26,6 +28,36 @@ pnpm build
 pnpm typecheck
 pnpm test
 ```
+
+## Release preflight
+
+Run the launch-hardening preflight before cutting a release candidate:
+
+```bash
+pnpm release:check
+```
+
+This runs lint, format checks, build, typecheck, tests, and a smoke pass that boots the built daemon on a temporary socket and queries it through the built CLI.
+
+## Operator flow
+
+Use the built daemon and CLI directly during packaging or local operator validation:
+
+```bash
+node apps/daemon/dist/index.js
+node apps/cli/dist/index.js status
+node apps/cli/dist/index.js service install
+node apps/cli/dist/index.js service status
+node apps/cli/dist/index.js service uninstall
+```
+
+The `service` commands target the macOS `launchd` user service flow added in `CG-019`.
+
+## Security caveats
+
+- Podman is the default detonation runtime. Docker remains a compatibility adapter, not the primary path.
+- VirusTotal and ClawHub are enrichment signals. A clean lookup is not proof that a skill is safe.
+- Detonation reduces risk by exercising setup and workflow behavior in a sandbox; it does not prove safety.
 
 ## Benchmark workflow
 

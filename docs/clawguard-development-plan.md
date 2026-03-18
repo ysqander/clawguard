@@ -4,15 +4,15 @@ This plan translates the product spec in `docs/clawguard-spec-v2.docx` into a de
 
 ## Current status snapshot
 
-As of 2026-03-17, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, static report synthesis that merges local findings with enrichment signals (`CG-012`), the first Podman-first runtime provider with Docker-compatible sandbox-image preparation (`CG-013`), the first dummy OpenClaw detonation environment with honeypot scaffolding and smoke-run validation (`CG-014`), the staged-download prompt runner that executes reproducible prompt plans with setup-command sequencing and sandbox-side prompt execution (`CG-015`), syscall-traced detonation telemetry with preserved raw artifacts plus decoupled VirusTotal indicator enrichment (`CG-016`), daemon job orchestration plus Unix-socket IPC (`CG-017`), CLI command coverage with concise/detailed operator formatting and explicit pre-Milestone-B detonation messaging (`CG-018`), the reusable fixture corpus plus gated static and full detonation benchmark harnesses (`CG-020`), and the end-to-end regression/security validation layer covering watcher-driven static flow, restart persistence, detonation artifact integrity, and runtime-unavailable degradation (`CG-021`).
+As of 2026-03-18, the repo has landed the foundational contracts and IPC shapes, the storage architecture, the macOS-first platform interfaces, the OpenClaw workspace discovery model, watcher scheduling, the quarantine lifecycle, skill snapshot production, the first static rule engine and scoring model, the ClawHub and VirusTotal client foundations, static report synthesis that merges local findings with enrichment signals (`CG-012`), the first Podman-first runtime provider with Docker-compatible sandbox-image preparation (`CG-013`), the first dummy OpenClaw detonation environment with honeypot scaffolding and smoke-run validation (`CG-014`), the staged-download prompt runner that executes reproducible prompt plans with setup-command sequencing and sandbox-side prompt execution (`CG-015`), syscall-traced detonation telemetry with preserved raw artifacts plus decoupled VirusTotal indicator enrichment (`CG-016`), daemon job orchestration plus Unix-socket IPC (`CG-017`), CLI command coverage with concise/detailed operator formatting and explicit pre-Milestone-B detonation messaging (`CG-018`), macOS notifications plus `launchd` user-service flows with daemon health surfacing (`CG-019`), the reusable fixture corpus plus gated static and full detonation benchmark harnesses (`CG-020`), and the end-to-end regression/security validation layer covering watcher-driven static flow, restart persistence, detonation artifact integrity, and runtime-unavailable degradation (`CG-021`).
 
 The main remaining work now centers on Milestone C launch hardening:
 
-- release-facing operator flows and packaging/docs completion (`CG-019`, `CG-022`)
+- release-facing packaging/docs completion (`CG-022`)
 
 Recommended immediate execution focus:
 
-- `CG-019` as the next launch-hardening step, wiring macOS notifications and `launchd` service flows on top of the stabilized validation outputs.
+- `CG-022` as the final launch-hardening step, finishing release packaging, operator docs, and launch caveats on top of the stabilized service and notification flows.
 
 ## Confirmed architecture decisions
 

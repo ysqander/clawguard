@@ -10,7 +10,7 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-17, the repo has landed the main code and documentation for `CG-001` through `CG-021`.
+As of 2026-03-18, the repo has landed the main code and documentation for `CG-001` through `CG-021`.
 
 `CG-020` now covers the reusable fixture corpus plus gated static and full detonation benchmark harnesses.
 
@@ -20,9 +20,7 @@ Milestone B behavioral validation coverage is complete after `CG-021` landed.
 
 The next unfinished launch tickets now start with:
 
-- `CG-019`: macOS notifications and launchd service setup
-
-`CG-022` remains blocked on the final packaging/docs pass after `CG-019`.
+- `CG-022`: package release flow and launch docs
 
 ## Epic A: Monorepo Foundation
 
@@ -390,7 +388,7 @@ Acceptance criteria:
 Priority: `P1`
 Milestone: `C`
 Depends on: `CG-004`, `CG-017`, `CG-018`
-Status: `Next`
+Status: `Complete`
 
 Scope:
 
@@ -449,6 +447,7 @@ Acceptance criteria:
 Priority: `P2`
 Milestone: `C`
 Depends on: `CG-018`, `CG-019`, `CG-021`
+Status: `Next`
 
 Scope:
 
@@ -466,12 +465,11 @@ Acceptance criteria:
 
 Immediate next tickets:
 
-- `CG-019`
+- `CG-022`
 
 Current recommended parallel work:
 
-- `CG-019` for notification delivery, daemon health surfacing, and `launchd` install flows
-- optional prep-only slicing of `CG-022` for doc structure while service wiring settles
+- `CG-022` for packaging, operator docs, launch caveats, and release verification automation
 
 Remaining Static MVP critical path:
 
@@ -483,9 +481,8 @@ Behavioral MVP critical path:
 
 Tickets that should wait for dependencies to settle:
 
-- `CG-022` until `CG-019` lands and service/notification output surfaces are stable
+- None (`CG-019` landed)
 
 Launch candidate closeout:
 
-- `CG-019`
 - `CG-022`

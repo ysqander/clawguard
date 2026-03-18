@@ -14,6 +14,8 @@
     "format": "biome format . --write",
     "format:check": "biome format .",
     "test": "pnpm -r --if-present --filter './packages/**' --filter './apps/**' run test",
+    "release:smoke": "pnpm build && node ./scripts/release-smoke.mjs",
+    "release:check": "pnpm lint && pnpm format:check && pnpm build && pnpm typecheck && pnpm test && node ./scripts/release-smoke.mjs",
     "clean": "pnpm -r --filter './packages/**' --filter './apps/**' run clean",
     "dev:cli": "pnpm --filter @clawguard/cli run dev",
     "dev:daemon": "pnpm --filter @clawguard/daemon run dev",
