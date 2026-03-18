@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { realpathSync } from "node:fs";
 import net from "node:net";
+import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
@@ -22,6 +25,7 @@ import { createPlatformAdapter } from "@clawguard/platform";
 import { renderStaticReport, renderStaticSummary } from "@clawguard/reports";
 
 import {
+  buildDaemonLaunchCommand,
   formatServiceCommandResult,
   getDaemonServiceStatus,
   installDaemonService,
@@ -38,6 +42,9 @@ type CliCommand =
   | {
       kind: "service";
       action: ServiceCommandAction;
+    }
+  | {
+      kind: "daemon-process";
     };
 
 export async function main(argv = process.argv): Promise<void> {
@@ -51,7 +58,10 @@ export async function main(argv = process.argv): Promise<void> {
     return;
   }
 
-  const resolvedCommand = buildCommand(command, commandArgs.filter((arg) => arg !== "--detailed"));
+  const resolvedCommand = buildCommand(
+    command,
+    commandArgs.filter((arg) => arg !== "--detailed"),
+  );
 
   if (resolvedCommand.kind === "service") {
     try {
@@ -60,6 +70,11 @@ export async function main(argv = process.argv): Promise<void> {
       console.error(error instanceof Error ? error.message : "Unknown service command failure");
       process.exitCode = 1;
     }
+    return;
+  }
+
+  if (resolvedCommand.kind === "daemon-process") {
+    await runDaemonCommand();
     return;
   }
 
@@ -84,6 +99,12 @@ export async function main(argv = process.argv): Promise<void> {
 }
 
 export function buildCommand(command: string, args: string[]): CliCommand {
+  if (command === "daemon") {
+    return {
+      kind: "daemon-process",
+    };
+  }
+
   if (command === "service") {
     return {
       kind: "service",
@@ -269,7 +290,7 @@ function formatReportResponse(data: ReportResponseData, detailed: boolean): stri
   return lines.join("\n");
 }
 
-function formatConnectionError(error: unknown): string {
+export function formatConnectionError(error: unknown): string {
   const socketPath = resolveDaemonSocketPath();
 
   if (
@@ -279,7 +300,7 @@ function formatConnectionError(error: unknown): string {
   ) {
     return [
       `Unable to connect to ClawGuard daemon at ${socketPath}.`,
-      "Start the daemon first: node apps/daemon/dist/index.js",
+      "Start the daemon first: clawguard daemon",
       "Then retry your command.",
     ].join("\n");
   }
@@ -320,6 +341,7 @@ function getHelpText(): string {
     "Commands:",
     "  clawguard status",
     "  clawguard audit",
+    "  clawguard daemon",
     "  clawguard scan <skill-path> [--detailed]",
     "  clawguard report <slug> [--detailed]",
     "  clawguard allow <slug> [reason] [--detailed]",
@@ -357,6 +379,57 @@ async function runServiceCommand(action: ServiceCommandAction): Promise<string> 
     case "uninstall":
       return formatServiceCommandResult(await uninstallDaemonService(client));
   }
+}
+
+async function runDaemonCommand(): Promise<void> {
+  const launch = buildForegroundDaemonLaunchCommand();
+  const daemon = spawn(launch.program, launch.args, {
+    cwd: launch.workingDirectory,
+    env: process.env,
+    stdio: "inherit",
+  });
+  const forwardedSignals: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"];
+
+  await new Promise<void>((resolve, reject) => {
+    const cleanup = () => {
+      daemon.off("error", onError);
+      daemon.off("exit", onExit);
+      for (const signal of forwardedSignals) {
+        process.off(signal, onSignal);
+      }
+    };
+
+    const onSignal = (signal: NodeJS.Signals) => {
+      if (daemon.exitCode === null && !daemon.killed) {
+        daemon.kill(signal);
+      }
+    };
+
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      cleanup();
+      process.exitCode =
+        code ??
+        (signal === "SIGHUP" ? 129 : signal === "SIGINT" ? 130 : signal === "SIGTERM" ? 143 : 1);
+      resolve();
+    };
+
+    daemon.on("error", onError);
+    daemon.on("exit", onExit);
+    for (const signal of forwardedSignals) {
+      process.on(signal, onSignal);
+    }
+  });
+}
+
+export function buildForegroundDaemonLaunchCommand() {
+  return buildDaemonLaunchCommand({
+    workingDirectory: process.cwd(),
+  });
 }
 
 async function sendDaemonRequest(payload: DaemonRequestPayload): Promise<DaemonResponseEnvelope> {
@@ -399,8 +472,18 @@ async function sendDaemonRequest(payload: DaemonRequestPayload): Promise<DaemonR
   });
 }
 
-const isEntrypoint = process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1];
+const isEntrypoint =
+  process.argv[1] !== undefined &&
+  resolveEntrypointPath(fileURLToPath(import.meta.url)) === resolveEntrypointPath(process.argv[1]);
 
 if (isEntrypoint) {
   await main();
+}
+
+function resolveEntrypointPath(filePath: string): string {
+  try {
+    return realpathSync(path.resolve(filePath));
+  } catch {
+    return path.resolve(filePath);
+  }
 }

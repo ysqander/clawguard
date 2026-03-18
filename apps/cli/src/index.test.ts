@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildCommand, buildPayload, formatSuccess } from "./index.js";
+import {
+  buildCommand,
+  buildForegroundDaemonLaunchCommand,
+  buildPayload,
+  formatConnectionError,
+  formatSuccess,
+} from "./index.js";
 
 test("buildPayload parses static-path commands", () => {
   assert.deepEqual(buildPayload("status", []), { command: "status" });
@@ -33,6 +39,9 @@ test("buildPayload keeps detonate command on CLI surface", () => {
 });
 
 test("buildCommand parses direct service-management commands", () => {
+  assert.deepEqual(buildCommand("daemon", []), {
+    kind: "daemon-process",
+  });
   assert.deepEqual(buildCommand("service", ["install"]), {
     kind: "service",
     action: "install",
@@ -72,4 +81,17 @@ test("formatSuccess tolerates legacy status payloads without watcher fields", ()
     ),
     ["ClawGuard daemon status", "- State: idle", "- Active jobs: 0"].join("\n"),
   );
+});
+
+test("formatConnectionError points operators at the install-safe daemon command", () => {
+  const error = new Error("missing socket") as NodeJS.ErrnoException;
+  error.code = "ENOENT";
+
+  assert.match(formatConnectionError(error), /Start the daemon first: clawguard daemon/u);
+});
+
+test("foreground daemon launch preserves the caller cwd", () => {
+  const launch = buildForegroundDaemonLaunchCommand();
+
+  assert.equal(launch.workingDirectory, process.cwd());
 });
