@@ -346,30 +346,9 @@ async function createOperationalRuntimeProvider() {
     }
 
     return provider;
-  } catch (error) {
-    if (isOperationalRuntimeError(error)) {
-      return undefined;
-    }
-
-    throw error;
+  } catch {
+    return undefined;
   }
-}
-
-function isOperationalRuntimeError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  return [
-    "Cannot connect to the Docker daemon",
-    "podman machine",
-    "connection refused",
-    "no such host",
-    "permission denied while trying to connect",
-    "no container with name or ID",
-    "Unable to build sandbox image",
-    "Unable to pull sandbox image",
-  ].some((fragment) => error.message.includes(fragment));
 }
 
 async function createSandbox(
