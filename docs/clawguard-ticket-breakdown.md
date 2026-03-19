@@ -10,7 +10,7 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-18, the repo has landed the main code and documentation for `CG-001` through `CG-021`.
+As of 2026-03-19, the repo has landed the main code and documentation for `CG-001` through `CG-022`.
 
 `CG-020` now covers the reusable fixture corpus plus gated static and full detonation benchmark harnesses.
 
@@ -18,9 +18,9 @@ Milestone A static-path coverage is complete after `CG-018` landed.
 
 Milestone B behavioral validation coverage is complete after `CG-021` landed.
 
-The next unfinished launch tickets now start with:
+Milestone C launch hardening is complete after `CG-022` landed.
 
-- `CG-022`: package release flow and launch docs
+There are no remaining pre-launch implementation tickets in this plan.
 
 ## Epic A: Monorepo Foundation
 
@@ -446,7 +446,7 @@ Acceptance criteria:
 Priority: `P2`
 Milestone: `C`
 Depends on: `CG-018`, `CG-019`, `CG-021`
-Status: `In Progress`
+Status: `Complete`
 
 Scope:
 
@@ -464,11 +464,12 @@ Acceptance criteria:
 
 Immediate next tickets:
 
-- `CG-022`
+- Define the first post-MVP hardening milestone and new ticket set.
 
 Current recommended parallel work:
 
-- `CG-022` for packaging, operator docs, launch caveats, and release verification automation
+- Publish the validated npm/GitHub release and attach launch demo collateral.
+- Start the first post-MVP quality-hardening lane for broader corpus coverage and detection tuning.
 
 Remaining Static MVP critical path:
 
@@ -484,4 +485,4 @@ Tickets that should wait for dependencies to settle:
 
 Launch candidate closeout:
 
-- `CG-022`
+- Complete
