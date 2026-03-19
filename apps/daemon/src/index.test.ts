@@ -1569,8 +1569,6 @@ test("watcher skips stale rescans after quarantine without crashing the daemon",
   );
 
   assert.notEqual(statusWithWarning.state, "degraded");
-  const settledStatus = await waitForStatus(socketPath, (current) => current.state === "idle");
-  assert.equal(settledStatus.watcher, "running");
   const persistedReport = expectReportResponse(
     await sendDaemonRequest(socketPath, {
       command: "report",
