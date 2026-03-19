@@ -244,6 +244,8 @@ pnpm bench:detonation:ci
 - [Ticket breakdown](docs/clawguard-ticket-breakdown.md)
 - [Architecture decision records](docs/adr/README.md)
 - [IPC overview](docs/ipc-overview.md)
+- [Release checklist](docs/release-checklist.md)
+- [0.1.0 release notes draft](docs/releases/0.1.0.md)
 
 ## License
 
