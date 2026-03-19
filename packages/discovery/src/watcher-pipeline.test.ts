@@ -30,6 +30,23 @@ test("resolveSkillPathFromEvent maps nested changes to the top-level skill dir",
   );
 });
 
+test("resolveSkillPathFromEvent ignores quarantine directories", () => {
+  assert.equal(
+    resolveSkillPathFromEvent(
+      "/tmp/workspace/skills",
+      "/tmp/workspace/skills/example.quarantine/SKILL.md",
+    ),
+    undefined,
+  );
+  assert.equal(
+    resolveSkillPathFromEvent(
+      "/tmp/workspace/skills",
+      "/tmp/workspace/skills/example.quarantine-2/SKILL.md",
+    ),
+    undefined,
+  );
+});
+
 test("coalesces repeated file writes into one scheduled scan per skill", async () => {
   const fakeWatcher = new FakeFileWatcher();
   const scheduled: Array<{ skillPath: string; eventCount: number; workspaceId?: string }> = [];

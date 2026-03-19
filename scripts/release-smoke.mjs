@@ -42,11 +42,7 @@ async function main() {
         },
       );
 
-      if (
-        detonate.code !== 0 &&
-        !detonate.stderr.includes("runtime_unavailable") &&
-        !detonate.stderr.includes("sandbox_image_failure")
-      ) {
+      if (detonate.code !== 0 && !detonate.stderr.includes("runtime_unavailable")) {
         throw new Error(
           `Detonation smoke failed unexpectedly (code=${detonate.code} stderr=${detonate.stderr.trim()})`,
         );

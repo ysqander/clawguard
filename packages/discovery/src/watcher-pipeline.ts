@@ -1,6 +1,10 @@
 import path from "node:path";
 
-import type { DiscoveredSkillRoot, OpenClawWorkspaceModel } from "@clawguard/contracts";
+import {
+  defaultClawGuardConfig,
+  type DiscoveredSkillRoot,
+  type OpenClawWorkspaceModel,
+} from "@clawguard/contracts";
 import type {
   FileWatchEvent,
   FileWatcher,
@@ -79,6 +83,10 @@ interface PendingRootRescanBatch {
 }
 
 type WatchEventTarget = { kind: "skill"; skillPath: string } | { kind: "root" };
+
+const quarantinePathPattern = new RegExp(
+  `${escapeForRegExp(defaultClawGuardConfig.paths.quarantineSuffix)}(?:-\\d+)?$`,
+);
 
 export class SkillWatcherPipeline {
   private readonly debounceMs: number;
@@ -367,6 +375,10 @@ export function resolveSkillPathFromEvent(rootPath: string, eventPath: string): 
     return undefined;
   }
 
+  if (quarantinePathPattern.test(skillSlug)) {
+    return undefined;
+  }
+
   return path.join(rootPath, skillSlug);
 }
 
@@ -391,4 +403,8 @@ function splitPath(filePath: string): string[] {
     .split(path.sep)
     .map((segment) => segment.trim())
     .filter((segment) => segment.length > 0 && segment !== ".");
+}
+
+function escapeForRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

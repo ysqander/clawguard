@@ -46,8 +46,17 @@ async function assertPackResult(packResult) {
     throw new Error("Packed artifact is missing dist/daemon.js");
   }
 
+  if (!filePaths.includes("sandbox/Containerfile")) {
+    throw new Error("Packed artifact is missing sandbox/Containerfile");
+  }
+
   for (const filePath of filePaths) {
-    if (filePath === "package.json" || filePath === "README.md" || filePath.startsWith("dist/")) {
+    if (
+      filePath === "package.json" ||
+      filePath === "README.md" ||
+      filePath.startsWith("dist/") ||
+      filePath === "sandbox/Containerfile"
+    ) {
       continue;
     }
 

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 import type { DetonationRuntimeKind } from "@clawguard/contracts";
@@ -9,8 +10,34 @@ export type DetonationRuntime = DetonationRuntimeKind;
 export const defaultDetonationRuntime: DetonationRuntimeKind = "podman";
 export const defaultSandboxImageTag = "ghcr.io/clawguard/detonation-sandbox:0.1.0";
 
-const SANDBOX_CONTAINERFILE_PATH = path.resolve(import.meta.dirname, "../sandbox/Containerfile");
-const SANDBOX_CONTEXT_DIR = path.resolve(import.meta.dirname, "../sandbox");
+export interface ResolvedSandboxBuildAssets {
+  containerfilePath: string;
+  contextDirectory: string;
+}
+
+export function resolveDefaultSandboxBuildAssets(
+  options: { moduleDirectory?: string; cwd?: string } = {},
+): ResolvedSandboxBuildAssets | undefined {
+  const moduleDirectory = options.moduleDirectory ?? import.meta.dirname;
+  const cwd = options.cwd ?? process.cwd();
+  const candidates = dedupePaths([
+    path.resolve(moduleDirectory, "../sandbox"),
+    path.resolve(moduleDirectory, "../../packages/detonation/sandbox"),
+    path.resolve(cwd, "sandbox"),
+  ]);
+
+  for (const contextDirectory of candidates) {
+    const containerfilePath = path.join(contextDirectory, "Containerfile");
+    if (existsSync(contextDirectory) && existsSync(containerfilePath)) {
+      return {
+        containerfilePath,
+        contextDirectory,
+      };
+    }
+  }
+
+  return undefined;
+}
 
 export interface RuntimeCommandResult {
   readonly exitCode: number;
@@ -171,7 +198,12 @@ class ContainerRuntimeProvider implements DetonationRuntimeProvider {
       };
     }
 
-    const strategy = options.strategy ?? "build";
+    const resolvedAssets =
+      options.containerfilePath !== undefined || options.contextDirectory !== undefined
+        ? resolveExplicitSandboxBuildAssets(options)
+        : resolveDefaultSandboxBuildAssets();
+    const strategy = options.strategy ?? (resolvedAssets !== undefined ? "build" : "pull");
+
     if (strategy === "pull") {
       await this.runOrThrow(["pull", imageTag], `Unable to pull sandbox image ${imageTag}.`);
       return {
@@ -182,11 +214,25 @@ class ContainerRuntimeProvider implements DetonationRuntimeProvider {
       };
     }
 
-    const containerfilePath = options.containerfilePath ?? SANDBOX_CONTAINERFILE_PATH;
-    const contextDirectory = options.contextDirectory ?? SANDBOX_CONTEXT_DIR;
+    if (resolvedAssets === undefined) {
+      await this.runOrThrow(["pull", imageTag], `Unable to pull sandbox image ${imageTag}.`);
+      return {
+        runtime: this.runtime,
+        runtimeCommand: this.command,
+        imageTag,
+        source: "pulled",
+      };
+    }
 
     await this.runOrThrow(
-      ["build", "--file", containerfilePath, "--tag", imageTag, contextDirectory],
+      [
+        "build",
+        "--file",
+        resolvedAssets.containerfilePath,
+        "--tag",
+        imageTag,
+        resolvedAssets.contextDirectory,
+      ],
       `Unable to build sandbox image ${imageTag}.`,
     );
 
@@ -222,4 +268,27 @@ class ContainerRuntimeProvider implements DetonationRuntimeProvider {
       throw new Error(`${message} ${result.stderr || result.stdout}`.trim());
     }
   }
+}
+
+function resolveExplicitSandboxBuildAssets(
+  options: Pick<EnsureSandboxImageOptions, "containerfilePath" | "contextDirectory">,
+): ResolvedSandboxBuildAssets | undefined {
+  const explicitContainerfilePath = options.containerfilePath;
+  const explicitContextDirectory = options.contextDirectory;
+  if (!explicitContainerfilePath || !explicitContextDirectory) {
+    return undefined;
+  }
+
+  if (!existsSync(explicitContainerfilePath) || !existsSync(explicitContextDirectory)) {
+    return undefined;
+  }
+
+  return {
+    containerfilePath: explicitContainerfilePath,
+    contextDirectory: explicitContextDirectory,
+  };
+}
+
+function dedupePaths(paths: string[]): string[] {
+  return [...new Set(paths)];
 }

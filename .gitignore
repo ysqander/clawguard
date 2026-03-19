@@ -1,6 +1,7 @@
 node_modules
 dist
 .release
+sandbox
 .DS_Store
 .pnpm-store
 coverage

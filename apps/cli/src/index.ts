@@ -501,10 +501,12 @@ async function sendDaemonRequest(payload: DaemonRequestPayload): Promise<DaemonR
 
     socket.on("data", (chunk) => {
       buffer += chunk;
-      const [line] = buffer.split("\n");
-      if (!line) {
+      const newlineIndex = buffer.indexOf("\n");
+      if (newlineIndex === -1) {
         return;
       }
+      const line = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
 
       try {
         const parsed = daemonResponseEnvelopeValidator.parse(JSON.parse(line));

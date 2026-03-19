@@ -59,17 +59,44 @@ const SCAN_RETRY_LIMIT = 2;
 const RETRY_DELAY_MS = 150;
 const MAX_WARNING_ISSUES = 10;
 
+type SnapshotBuildError = Extract<
+  Awaited<ReturnType<typeof buildSkillSnapshot>>,
+  { ok: false }
+>["error"];
+
 interface ScanJobResult {
+  skipped?: false;
   scan: ScanRecord;
   report?: StaticScanReport;
   storedReport?: StoredStaticReport;
+}
+
+interface SkippedScanJobResult {
+  skipped: true;
+  skillPath: string;
+  reason: string;
+}
+
+type ScanQueueResult = ScanJobResult | SkippedScanJobResult;
+
+type ScanOrigin = "manual" | "watcher" | "detonation-refresh";
+
+class SnapshotBuildFailure extends Error {
+  public readonly buildError: SnapshotBuildError;
+
+  public constructor(buildError: SnapshotBuildError) {
+    super(buildError.message);
+    this.name = "SnapshotBuildFailure";
+    this.buildError = buildError;
+  }
 }
 
 interface QueuedScanJob {
   idempotencyKey: string;
   skillPath: string;
   scheduleAutoDetonation: boolean;
-  resolve: (value: ScanJobResult) => void;
+  origin: ScanOrigin;
+  resolve: (value: ScanQueueResult) => void;
   reject: (error: Error) => void;
 }
 
@@ -114,7 +141,7 @@ export class DaemonServer {
   private readonly storage: ReturnType<typeof createStorage>;
   private readonly lifecycle: SkillLifecycleManager;
   private readonly scanQueue: QueuedScanJob[] = [];
-  private readonly inflightScanByKey = new Map<string, Promise<ScanJobResult>>();
+  private readonly inflightScanByKey = new Map<string, Promise<ScanQueueResult>>();
   private readonly detonationQueue: QueuedDetonationJob[] = [];
   private readonly inflightDetonationByKey = new Map<string, Promise<DetonationJobResult>>();
   private readonly startWatcher: boolean;
@@ -223,7 +250,7 @@ export class DaemonServer {
         workspaceModel,
         watcher: this.platform.watcher,
         onScanScheduled: async (scan) => {
-          void this.enqueueScan(scan.idempotencyKey, scan.skillPath, true);
+          void this.enqueueScan(scan.idempotencyKey, scan.skillPath, true, "watcher");
         },
         onRootRescanRequested: async () => {
           // Root rescans are advisory; watcher event granularity already provides skill-level scans.
@@ -277,7 +304,11 @@ export class DaemonServer {
             request.payload.skillPath,
             request.payload.skillPath,
             true,
+            "manual",
           );
+          if (result.skipped) {
+            throw new Error(`Scan for ${request.payload.skillPath} was skipped unexpectedly.`);
+          }
           return this.successResponse(request.requestId, {
             scan: result.scan,
             ...(result.report ? { report: result.report } : {}),
@@ -400,7 +431,8 @@ export class DaemonServer {
     idempotencyKey: string,
     skillPath: string,
     scheduleAutoDetonation: boolean,
-  ): Promise<ScanJobResult> {
+    origin: ScanOrigin,
+  ): Promise<ScanQueueResult> {
     const inflight = this.inflightScanByKey.get(idempotencyKey);
     if (inflight) {
       return inflight;
@@ -410,11 +442,12 @@ export class DaemonServer {
       throw new Error(`Scan queue is full (${MAX_QUEUE_DEPTH}).`);
     }
 
-    const promise = new Promise<ScanJobResult>((resolve, reject) => {
+    const promise = new Promise<ScanQueueResult>((resolve, reject) => {
       this.scanQueue.push({
         idempotencyKey,
         skillPath,
         scheduleAutoDetonation,
+        origin,
         resolve,
         reject,
       });
@@ -441,7 +474,11 @@ export class DaemonServer {
       }
 
       try {
-        const result = await this.runScanWithRetry(job.skillPath, job.scheduleAutoDetonation);
+        const result = await this.runScanWithRetry(
+          job.skillPath,
+          job.scheduleAutoDetonation,
+          job.origin,
+        );
         job.resolve(result);
       } catch (error) {
         job.reject(error instanceof Error ? error : new Error(String(error)));
@@ -453,7 +490,8 @@ export class DaemonServer {
   private async runScanWithRetry(
     skillPath: string,
     scheduleAutoDetonation: boolean,
-  ): Promise<ScanJobResult> {
+    origin: ScanOrigin,
+  ): Promise<ScanQueueResult> {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= SCAN_RETRY_LIMIT; attempt += 1) {
@@ -461,6 +499,22 @@ export class DaemonServer {
         return await this.runScan(skillPath, scheduleAutoDetonation);
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
+        if (isSnapshotBuildFailure(lastError)) {
+          if (origin === "watcher" && isSkippableWatcherSnapshotFailure(lastError)) {
+            const reason = `Watcher skipped stale skill scan for ${skillPath}: ${lastError.message}`;
+            this.recordWarningIssue(reason);
+            return {
+              skipped: true,
+              skillPath,
+              reason,
+            };
+          }
+
+          if (isMissingSnapshotFailure(lastError)) {
+            throw lastError;
+          }
+        }
+
         if (attempt < SCAN_RETRY_LIMIT) {
           await delay(RETRY_DELAY_MS);
         }
@@ -484,7 +538,7 @@ export class DaemonServer {
     });
 
     if (!snapshotResult.ok) {
-      throw new Error(snapshotResult.error.message);
+      throw new SnapshotBuildFailure(snapshotResult.error);
     }
 
     const scanReport = scanSkillSnapshot(snapshotResult.snapshot);
@@ -567,11 +621,25 @@ export class DaemonServer {
       }
     }
 
-    const scanResult = await this.enqueueScan(
-      localSkill.snapshot.path,
-      localSkill.snapshot.path,
-      false,
-    );
+    let scanResult: ScanQueueResult;
+    try {
+      scanResult = await this.enqueueScan(
+        localSkill.snapshot.path,
+        localSkill.snapshot.path,
+        false,
+        "detonation-refresh",
+      );
+    } catch (error) {
+      if (isMissingSnapshotFailure(error)) {
+        return undefined;
+      }
+
+      throw error;
+    }
+
+    if (scanResult.skipped) {
+      return undefined;
+    }
     if (!scanResult.storedReport) {
       throw new Error(`Static scan for ${slug} completed without a stored report.`);
     }
@@ -1177,6 +1245,36 @@ function toArtifactRef(artifact: StoredArtifactRecord) {
     path: artifact.path,
     mimeType: artifact.mimeType,
   } as const;
+}
+
+function isSnapshotBuildFailure(
+  error: unknown,
+): error is Error & { buildError: SnapshotBuildError } {
+  return (
+    error instanceof Error &&
+    "buildError" in error &&
+    typeof error.buildError === "object" &&
+    error.buildError !== null &&
+    "kind" in error.buildError &&
+    typeof error.buildError.kind === "string" &&
+    "message" in error.buildError &&
+    typeof error.buildError.message === "string"
+  );
+}
+
+function isMissingSnapshotFailure(
+  error: unknown,
+): error is Error & { buildError: SnapshotBuildError } {
+  return (
+    isSnapshotBuildFailure(error) &&
+    (error.buildError.kind === "missing-skill" || error.buildError.kind === "missing-skill-md")
+  );
+}
+
+function isSkippableWatcherSnapshotFailure(
+  error: Error & { buildError: SnapshotBuildError },
+): boolean {
+  return error.buildError.kind === "missing-skill" || error.buildError.kind === "missing-skill-md";
 }
 
 function isMissingWatchRootError(error: Error): boolean {

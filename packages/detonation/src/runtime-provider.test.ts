@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -11,6 +11,7 @@ import {
   createDetonationRuntimeProvider,
   RuntimeCommandTimeoutError,
 } from "./index.js";
+import { resolveDefaultSandboxBuildAssets } from "./runtime-provider.js";
 
 function createRuntimeDetector(
   runtime?: DetectedContainerRuntime,
@@ -192,6 +193,95 @@ test("runtime providers share image-cache semantics across podman and docker", a
     assert.equal(commandCalls[0]?.command, runtime);
     assert.ok(commandCalls[1]?.args.includes("build"));
   }
+});
+
+test("resolveDefaultSandboxBuildAssets prefers a packaged sandbox beside bundled dist output", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "clawguard-detonation-packaged-assets-"));
+
+  try {
+    const moduleDirectory = path.join(tempRoot, "dist");
+    const sandboxDirectory = path.join(tempRoot, "sandbox");
+    await mkdir(moduleDirectory, { recursive: true });
+    await mkdir(sandboxDirectory, { recursive: true });
+    await writeFile(path.join(sandboxDirectory, "Containerfile"), "FROM scratch\n", "utf8");
+
+    const assets = resolveDefaultSandboxBuildAssets({
+      moduleDirectory,
+      cwd: path.join(tempRoot, "cwd"),
+    });
+
+    assert.deepEqual(assets, {
+      containerfilePath: path.join(sandboxDirectory, "Containerfile"),
+      contextDirectory: sandboxDirectory,
+    });
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("resolveDefaultSandboxBuildAssets falls back to the workspace package sandbox", async () => {
+  const tempRoot = await mkdtemp(path.join(tmpdir(), "clawguard-detonation-workspace-assets-"));
+
+  try {
+    const moduleDirectory = path.join(tempRoot, "packages", "detonation", "dist");
+    const sandboxDirectory = path.join(tempRoot, "packages", "detonation", "sandbox");
+    await mkdir(moduleDirectory, { recursive: true });
+    await mkdir(sandboxDirectory, { recursive: true });
+    await writeFile(path.join(sandboxDirectory, "Containerfile"), "FROM scratch\n", "utf8");
+
+    const assets = resolveDefaultSandboxBuildAssets({
+      moduleDirectory,
+      cwd: path.join(tempRoot, "cwd"),
+    });
+
+    assert.deepEqual(assets, {
+      containerfilePath: path.join(sandboxDirectory, "Containerfile"),
+      contextDirectory: sandboxDirectory,
+    });
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("ensureSandboxImage falls back to pulling when an explicit build context is missing", async () => {
+  const commandCalls: Array<{ command: string; args: string[] }> = [];
+  const provider = await createDetonationRuntimeProvider({
+    runtimeDetector: createRuntimeDetector({ runtime: "docker", command: "docker" }),
+    commandExecutor: {
+      async run(command, args) {
+        commandCalls.push({ command, args });
+
+        if (args.join(" ") === "image inspect ghcr.io/clawguard/detonation-sandbox:0.1.0") {
+          return {
+            exitCode: 1,
+            stdout: "",
+            stderr: "not found",
+          };
+        }
+
+        return {
+          exitCode: 0,
+          stdout: "ok",
+          stderr: "",
+        };
+      },
+    },
+  });
+
+  const result = await provider.ensureSandboxImage({
+    containerfilePath: "/missing/Containerfile",
+    contextDirectory: "/missing",
+  });
+
+  assert.equal(result.source, "pulled");
+  assert.equal(
+    commandCalls.some((call) => call.args.includes("build")),
+    false,
+  );
+  assert.equal(
+    commandCalls.some((call) => call.args.includes("pull")),
+    true,
+  );
 });
 
 test("sandbox Containerfile pins the base image by digest", async () => {

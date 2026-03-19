@@ -562,7 +562,9 @@ function executionReferencesChangedScript(
     return false;
   }
 
-  return [process.command, ...process.args].some((value) => pathMatchesChangedFile(value, changedPaths));
+  return [process.command, ...process.args].some((value) =>
+    pathMatchesChangedFile(value, changedPaths),
+  );
 }
 
 function pathMatchesChangedFile(candidate: string, changedPaths: Set<string>): boolean {
