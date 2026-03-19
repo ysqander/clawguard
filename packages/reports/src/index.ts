@@ -119,7 +119,8 @@ export function renderStaticSummary(
   report: StaticScanReport,
   threatIntelVerdicts: ThreatIntelVerdict[] = [],
 ): string {
-  const findingLabel = report.findings.length === 1 ? "1 finding" : `${report.findings.length} findings`;
+  const findingLabel =
+    report.findings.length === 1 ? "1 finding" : `${report.findings.length} findings`;
   const enrichmentLabel =
     threatIntelVerdicts.length === 0
       ? "no threat-intel enrichment"
@@ -150,7 +151,9 @@ export function renderStaticReport(
     lines.push("No local static findings were triggered.");
   } else {
     report.findings.forEach((finding, index) => {
-      lines.push(`${index + 1}. [${finding.severity.toUpperCase()}] ${finding.message} (${finding.ruleId})`);
+      lines.push(
+        `${index + 1}. [${finding.severity.toUpperCase()}] ${finding.message} (${finding.ruleId})`,
+      );
       for (const evidence of finding.evidence) {
         lines.push(`   - Evidence: ${evidence}`);
       }
@@ -158,7 +161,11 @@ export function renderStaticReport(
   }
 
   if (clawHubMetadata) {
-    lines.push("", "## ClawHub marketplace context", ...renderClawHubMarketplaceContext(report, clawHubMetadata));
+    lines.push(
+      "",
+      "## ClawHub marketplace context",
+      ...renderClawHubMarketplaceContext(report, clawHubMetadata),
+    );
   }
 
   lines.push("", "## Threat-intelligence enrichment");
@@ -183,7 +190,9 @@ export function renderStaticReport(
 
 function assertScanAndReportConsistency(scan: ScanRecord, report: StaticScanReport): void {
   if (scan.slug !== report.snapshot.slug) {
-    throw new Error(`scan.slug (${scan.slug}) must match report.snapshot.slug (${report.snapshot.slug})`);
+    throw new Error(
+      `scan.slug (${scan.slug}) must match report.snapshot.slug (${report.snapshot.slug})`,
+    );
   }
 
   if (scan.contentHash !== report.snapshot.contentHash) {
@@ -212,9 +221,11 @@ function renderClawHubMarketplaceContext(
 ): string[] {
   const metadataSlug = readMetadataString(clawHubMetadata, "slug");
   const name =
-    readMetadataString(clawHubMetadata, "displayName") ?? readMetadataString(clawHubMetadata, "name");
+    readMetadataString(clawHubMetadata, "displayName") ??
+    readMetadataString(clawHubMetadata, "name");
   const summary =
-    readMetadataString(clawHubMetadata, "summary") ?? readMetadataString(clawHubMetadata, "description");
+    readMetadataString(clawHubMetadata, "summary") ??
+    readMetadataString(clawHubMetadata, "description");
   const hasRecognizedMetadataFields =
     metadataSlug !== undefined || name !== undefined || summary !== undefined;
   const lines = [`- Slug: ${metadataSlug ?? report.snapshot.slug}`];
@@ -234,8 +245,13 @@ function renderClawHubMarketplaceContext(
   return lines;
 }
 
-function buildDecisionReason(report: StaticScanReport, threatIntelVerdicts: ThreatIntelVerdict[]): string {
-  const criticalFindings = report.findings.filter((finding) => finding.severity === "critical").length;
+function buildDecisionReason(
+  report: StaticScanReport,
+  threatIntelVerdicts: ThreatIntelVerdict[],
+): string {
+  const criticalFindings = report.findings.filter(
+    (finding) => finding.severity === "critical",
+  ).length;
 
   if (report.recommendation === "block") {
     if (criticalFindings > 0) {
@@ -249,7 +265,9 @@ function buildDecisionReason(report: StaticScanReport, threatIntelVerdicts: Thre
     return "Marked for review by local static findings; enrichment is included for analyst context.";
   }
 
-  if (threatIntelVerdicts.some((entry) => entry.verdict === "block" || entry.verdict === "review")) {
+  if (
+    threatIntelVerdicts.some((entry) => entry.verdict === "block" || entry.verdict === "review")
+  ) {
     return "Allowed by local static findings; enrichment flagged caution for follow-up analysis.";
   }
 

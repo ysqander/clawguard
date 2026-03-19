@@ -140,11 +140,7 @@ test("createChildProcessRuntimeCommandExecutor times out long-running commands",
     () =>
       executor.run(
         process.execPath,
-        [
-          "--input-type=module",
-          "--eval",
-          "setInterval(() => {}, 1000);",
-        ],
+        ["--input-type=module", "--eval", "setInterval(() => {}, 1000);"],
         { timeoutMs: 50 },
       ),
     (error) => {

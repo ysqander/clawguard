@@ -165,13 +165,25 @@ test("detonation integration persists artifacts and enriches normalized telemetr
 
     const reportJsonArtifact = built.artifacts.find((artifact) => artifact.type === "report-json");
     assert.ok(reportJsonArtifact);
-    const reportJson = await readFile(reportJsonArtifact!.path, "utf8");
+    const reportJson = await readFile(reportJsonArtifact.path, "utf8");
     assert.match(reportJson, /payloads\.evil\.example/u);
 
-    assert.equal(intelligence.some((entry) => entry.subjectType === "file"), true);
-    assert.equal(intelligence.some((entry) => entry.subjectType === "url"), true);
-    assert.equal(intelligence.some((entry) => entry.subjectType === "domain"), true);
-    assert.equal(intelligence.some((entry) => entry.subjectType === "ip"), true);
+    assert.equal(
+      intelligence.some((entry) => entry.subjectType === "file"),
+      true,
+    );
+    assert.equal(
+      intelligence.some((entry) => entry.subjectType === "url"),
+      true,
+    );
+    assert.equal(
+      intelligence.some((entry) => entry.subjectType === "domain"),
+      true,
+    );
+    assert.equal(
+      intelligence.some((entry) => entry.subjectType === "ip"),
+      true,
+    );
   } finally {
     await rm(artifactsRoot, { recursive: true, force: true });
   }

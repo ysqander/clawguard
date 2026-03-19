@@ -245,7 +245,9 @@ export async function runDetonationBenchmarkCli(
   };
 }
 
-function resolveCliOptions(env: NodeJS.ProcessEnv): Pick<DetonationBenchmarkOptions, "timeoutSeconds" | "budgetMs"> {
+function resolveCliOptions(
+  env: NodeJS.ProcessEnv,
+): Pick<DetonationBenchmarkOptions, "timeoutSeconds" | "budgetMs"> {
   const timeoutSeconds =
     parsePositiveInt(env.CLAWGUARD_BENCH_DETONATION_TIMEOUT_SECONDS) ?? DEFAULT_TIMEOUT_SECONDS;
   const shouldEnforceBudget =
@@ -352,10 +354,7 @@ function formatExecutionFailureMessage(
     return stderrMessage;
   }
 
-  if (
-    failedExecution?.stepId &&
-    failedExecution.result?.exitCode !== undefined
-  ) {
+  if (failedExecution?.stepId && failedExecution.result?.exitCode !== undefined) {
     return `Step ${failedExecution.stepId} failed with exit code ${failedExecution.result.exitCode}`;
   }
 

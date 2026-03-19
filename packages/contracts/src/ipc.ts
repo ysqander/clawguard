@@ -195,7 +195,8 @@ function parseStatusResponseData(input: unknown, path: string): StatusResponseDa
   return parseObject(input, path, (record) => {
     const watcher = parseOptional(
       record.watcher,
-      (value, valuePath) => parseEnum(value, ["disabled", "running", "degraded"] as const, valuePath),
+      (value, valuePath) =>
+        parseEnum(value, ["disabled", "running", "degraded"] as const, valuePath),
       `${path}.watcher`,
     );
     const issues = parseOptional(record.issues, parseArrayOfNonEmptyStrings, `${path}.issues`);

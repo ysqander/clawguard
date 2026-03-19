@@ -121,6 +121,8 @@ Tell the daemon to block a skill.
 
 Ask the daemon to run behavioral detonation for a skill.
 
+This request shape remains reserved in the IPC contract, but the packaged release CLI does not expose a `clawguard detonate` command yet.
+
 ```ts
 {
   command: "detonate",
@@ -318,7 +320,7 @@ If the full IPC type list feels too abstract, use this simpler framing:
 - `block`
   - "Reject this skill."
 - `detonate`
-  - "Run the deeper sandbox analysis."
+  - reserved for future behavioral orchestration; not exposed by the current release CLI
 - `audit`
   - "Show me the broader installed-skill picture."
 

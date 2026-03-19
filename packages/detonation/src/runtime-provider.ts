@@ -116,10 +116,11 @@ export function createChildProcessRuntimeCommandExecutor(): RuntimeCommandExecut
         });
 
         if (options.timeoutMs !== undefined) {
+          const timeoutMs = options.timeoutMs;
           timeoutId = setTimeout(() => {
-            timeoutError = new RuntimeCommandTimeoutError(command, args, options.timeoutMs!);
+            timeoutError = new RuntimeCommandTimeoutError(command, args, timeoutMs);
             child.kill("SIGKILL");
-          }, options.timeoutMs);
+          }, timeoutMs);
         }
       });
     },

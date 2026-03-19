@@ -1,6 +1,9 @@
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 import process from "node:process";
+
+import {
+  resolveDefaultDaemonEntrypointPath,
+  resolveDefaultServiceWorkingDirectory,
+} from "./install-layout.js";
 
 export const DEFAULT_DAEMON_SERVICE_LABEL = "com.clawguard.daemon";
 
@@ -49,6 +52,12 @@ export interface InstallServiceCommandResult {
   status: ServiceStatusLike;
 }
 
+export interface DaemonLaunchCommand {
+  program: string;
+  args: string[];
+  workingDirectory: string;
+}
+
 export interface StatusServiceCommandResult {
   command: "status";
   label: string;
@@ -67,18 +76,28 @@ export type ServiceCommandResult =
   | StatusServiceCommandResult
   | UninstallServiceCommandResult;
 
+export function buildDaemonLaunchCommand(options: ServiceCommandOptions = {}): DaemonLaunchCommand {
+  return {
+    program: options.nodeExecutable ?? process.execPath,
+    args: [
+      "--enable-source-maps",
+      options.daemonEntrypointPath ?? resolveDefaultDaemonEntrypointPath(),
+    ],
+    workingDirectory: options.workingDirectory ?? resolveDefaultServiceWorkingDirectory(),
+  };
+}
+
 export function buildDaemonServiceDefinition(
   options: ServiceCommandOptions = {},
 ): ServiceDefinitionLike {
   const label = options.label ?? DEFAULT_DAEMON_SERVICE_LABEL;
-  const daemonEntrypointPath = options.daemonEntrypointPath ?? resolveDefaultDaemonEntrypointPath();
-  const args = ["--enable-source-maps", daemonEntrypointPath];
+  const launch = buildDaemonLaunchCommand(options);
 
   return {
     label,
-    program: options.nodeExecutable ?? process.execPath,
-    args,
-    workingDirectory: options.workingDirectory ?? process.cwd(),
+    program: launch.program,
+    args: launch.args,
+    workingDirectory: launch.workingDirectory,
     runAtLoad: true,
     keepAlive: true,
   };
@@ -138,9 +157,10 @@ export function formatServiceCommandResult(result: ServiceCommandResult): string
         formatServiceStatus(result.status),
       ].join("\n");
     case "status":
-      return [`ClawGuard daemon service status (${result.label})`, formatServiceStatus(result.status)].join(
-        "\n",
-      );
+      return [
+        `ClawGuard daemon service status (${result.label})`,
+        formatServiceStatus(result.status),
+      ].join("\n");
     case "uninstall":
       return [
         "ClawGuard daemon service uninstalled",
@@ -150,11 +170,6 @@ export function formatServiceCommandResult(result: ServiceCommandResult): string
         `- Plist: ${result.before.plistPath}`,
       ].join("\n");
   }
-}
-
-export function resolveDefaultDaemonEntrypointPath(): string {
-  const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(moduleDirectory, "../../daemon/dist/index.js");
 }
 
 function formatServiceDefinition(service: ServiceDefinitionLike): string {

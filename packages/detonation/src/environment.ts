@@ -345,26 +345,29 @@ export async function runSandboxCommand(
     ...(options.imageTag !== undefined ? { imageTag: options.imageTag } : {}),
   });
 
-  return await provider.runRuntimeCommand([
-    "run",
-    "--rm",
-    "--cap-add=SYS_PTRACE",
-    "--security-opt",
-    "seccomp=unconfined",
-    "--workdir",
-    preparedEnvironment.container.workspaceDir,
-    "--env",
-    `HOME=${preparedEnvironment.container.homeDir}`,
-    "--volume",
-    `${preparedEnvironment.host.homeDir}:${preparedEnvironment.container.homeDir}`,
-    "--volume",
-    `${preparedEnvironment.host.workspaceDir}:${preparedEnvironment.container.workspaceDir}`,
-    image.imageTag,
-    command,
-    ...args,
-  ], {
-    ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
-  });
+  return await provider.runRuntimeCommand(
+    [
+      "run",
+      "--rm",
+      "--cap-add=SYS_PTRACE",
+      "--security-opt",
+      "seccomp=unconfined",
+      "--workdir",
+      preparedEnvironment.container.workspaceDir,
+      "--env",
+      `HOME=${preparedEnvironment.container.homeDir}`,
+      "--volume",
+      `${preparedEnvironment.host.homeDir}:${preparedEnvironment.container.homeDir}`,
+      "--volume",
+      `${preparedEnvironment.host.workspaceDir}:${preparedEnvironment.container.workspaceDir}`,
+      image.imageTag,
+      command,
+      ...args,
+    ],
+    {
+      ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+    },
+  );
 }
 
 async function copySnapshotFiles(

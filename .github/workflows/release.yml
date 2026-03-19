@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify tag matches package version
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          node -e "const fs=require('node:fs'); const pkg=JSON.parse(fs.readFileSync('package.json','utf8')); const expected=`v${pkg.version}`; const actual=process.env.GITHUB_REF_NAME; if (actual !== expected) { console.error(`Tag ${actual} does not match package version ${expected}`); process.exit(1); }"
+
+      - name: Run release checks
+        run: pnpm release:check
+
+      - name: Resolve packed tarball
+        id: tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="$(ls .release/*.tgz | head -n 1)"
+          echo "path=$tarball" >> "$GITHUB_OUTPUT"
+
+      - name: Publish package to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish "${{ steps.tarball.outputs.path }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.tarball.outputs.path }}
+          generate_release_notes: true

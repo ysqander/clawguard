@@ -77,7 +77,10 @@ test("runPromptRunner captures traces and diffs before cleanup", async () => {
   });
 
   assert.equal(result.stepTraces[0]?.files[0]?.filename, "prompt-1.trace.1001");
-  assert.equal(result.memoryDiffs.some((diff) => diff.changed && diff.currentContent.includes("poisoned")), true);
+  assert.equal(
+    result.memoryDiffs.some((diff) => diff.changed && diff.currentContent.includes("poisoned")),
+    true,
+  );
   assert.equal(
     result.fileChanges.some(
       (change) =>
@@ -345,7 +348,7 @@ test("runPromptRunner executes the staged-download fixture setup script in an op
   assert.match(combinedOutput, /payloads\.evil\.example|curl/u);
   assert.ok(
     result.execution
-      .slice(result.execution.indexOf(setupStep!) + 1)
+      .slice(result.execution.indexOf(setupStep) + 1)
       .every((entry) => entry.status === "skipped"),
   );
 });
@@ -366,9 +369,9 @@ function createSyntheticRequest(overrides: Partial<DetonationRequest> = {}): Det
   };
 }
 
-function createStubPrepareEnvironment(options: { onCleanup?: () => void } = {}): (
-  request: DetonationRequest,
-) => Promise<PreparedDetonationEnvironment> {
+function createStubPrepareEnvironment(
+  options: { onCleanup?: () => void } = {},
+): (request: DetonationRequest) => Promise<PreparedDetonationEnvironment> {
   return async (request) => ({
     request,
     layout: {

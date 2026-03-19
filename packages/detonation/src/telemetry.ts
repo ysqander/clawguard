@@ -10,10 +10,17 @@ import type {
   ThreatIntelVerdict,
 } from "@clawguard/contracts";
 
-import type { PromptRunnerFileChange, PromptRunnerResult, PromptRunnerStepTrace } from "./prompt-runner.js";
+import type {
+  PromptRunnerFileChange,
+  PromptRunnerResult,
+  PromptRunnerStepTrace,
+} from "./prompt-runner.js";
 
 const SANDBOX_PATH_PREFIXES = ["/workspace/openclaw", "/home/clawguard"] as const;
-const INTERNAL_SANDBOX_PREFIXES = ["/workspace/openclaw/.clawguard/", "/home/clawguard/.clawguard/"] as const;
+const INTERNAL_SANDBOX_PREFIXES = [
+  "/workspace/openclaw/.clawguard/",
+  "/home/clawguard/.clawguard/",
+] as const;
 
 export interface DetonationTelemetryVirusTotalClient {
   getFileVerdict?(contentHash: string): Promise<ThreatIntelVerdict | null>;
@@ -43,9 +50,11 @@ export async function buildDetonationReportFromPromptRunner(
     ? await persistTelemetryArtifacts(result, telemetry, options.artifactsRoot, generatedAt)
     : [];
 
-  const triggeredActions = telemetry
-    .filter((event) => event.type === "process" && event.process)
-    .map((event) => formatCommandLine(event.process!.command, event.process!.args));
+  const triggeredActions = telemetry.flatMap((event) =>
+    event.type === "process" && event.process
+      ? [formatCommandLine(event.process.command, event.process.args)]
+      : [],
+  );
 
   const report: DetonationReport = {
     request: result.request,
@@ -159,7 +168,11 @@ function collectTelemetry(
     }
     pushEvent({
       type: "process",
-      detail: describeProcess(execution.command ?? "", execution.args ?? [], execution.result.exitCode),
+      detail: describeProcess(
+        execution.command ?? "",
+        execution.args ?? [],
+        execution.result.exitCode,
+      ),
       observedAt: execution.completedAt ?? generatedAt,
       stepId: execution.stepId,
       process: {
@@ -224,11 +237,7 @@ function appendTraceEvents(
 ): void {
   for (const traceFile of stepTrace.files) {
     for (const line of traceFile.content.split(/\r?\n/u)) {
-      if (
-        line.length === 0 ||
-        line.includes("<unfinished ...>") ||
-        line.includes("resumed>")
-      ) {
+      if (line.length === 0 || line.includes("<unfinished ...>") || line.includes("resumed>")) {
         continue;
       }
 
@@ -377,7 +386,11 @@ async function persistTelemetryArtifacts(
         continue;
       }
 
-      const fileDiffPath = path.join(requestRoot, "files", `${sanitizeArtifactFilename(change.path)}.diff`);
+      const fileDiffPath = path.join(
+        requestRoot,
+        "files",
+        `${sanitizeArtifactFilename(change.path)}.diff`,
+      );
       await writeFile(fileDiffPath, change.diffText, "utf8");
       artifacts.push({
         scanId: result.request.requestId,
@@ -408,7 +421,12 @@ function collectThreatIntelIndicators(
   for (const event of telemetry) {
     if (event.indicator) {
       const { subjectType, subject } = event.indicator;
-      if (subjectType === "file" || subjectType === "url" || subjectType === "domain" || subjectType === "ip") {
+      if (
+        subjectType === "file" ||
+        subjectType === "url" ||
+        subjectType === "domain" ||
+        subjectType === "ip"
+      ) {
         indicators.push({ subjectType, subject });
       }
     }
@@ -460,9 +478,7 @@ function extractProcessIndicators(
   return indicators;
 }
 
-function parseExecveObservation(
-  line: string,
-): DetonationTelemetryEvent["process"] | undefined {
+function parseExecveObservation(line: string): DetonationTelemetryEvent["process"] | undefined {
   const match = line.match(/execve\("([^"]+)",\s*\[(.*)\],\s*.+\)\s*=\s*0/u);
   if (!match) {
     return undefined;
@@ -483,16 +499,12 @@ function parseExecveArguments(serialized: string): string[] {
   return args;
 }
 
-function parseNetworkObservation(
-  line: string,
-): DetonationTelemetryEvent["network"] | undefined {
+function parseNetworkObservation(line: string): DetonationTelemetryEvent["network"] | undefined {
   if (!/\bconnect\(/u.test(line) || !/\)\s*=\s*0\b/u.test(line)) {
     return undefined;
   }
 
-  const ipv4Match = line.match(
-    /sin_port=htons\((\d+)\).*?inet_addr\("([^"]+)"\)/u,
-  );
+  const ipv4Match = line.match(/sin_port=htons\((\d+)\).*?inet_addr\("([^"]+)"\)/u);
   if (ipv4Match) {
     return {
       protocol: detectProtocol(line),
@@ -501,9 +513,7 @@ function parseNetworkObservation(
     };
   }
 
-  const ipv6Match = line.match(
-    /sin6_port=htons\((\d+)\).*?inet_pton\(AF_INET6,\s*"([^"]+)"/u,
-  );
+  const ipv6Match = line.match(/sin6_port=htons\((\d+)\).*?inet_pton\(AF_INET6,\s*"([^"]+)"/u);
   if (ipv6Match) {
     return {
       protocol: detectProtocol(line),
@@ -574,7 +584,9 @@ function formatCommandLine(command: string, args: string[]): string {
 
 function describeProcess(command: string, args: string[], exitCode?: number): string {
   const rendered = formatCommandLine(command, args);
-  return exitCode === undefined ? `Executed ${rendered}` : `Executed ${rendered} (exit ${exitCode})`;
+  return exitCode === undefined
+    ? `Executed ${rendered}`
+    : `Executed ${rendered} (exit ${exitCode})`;
 }
 
 function describeFileObservation(file: DetonationFileObservation): string {
@@ -598,15 +610,17 @@ function toFileOperation(kind: PromptRunnerFileChange["kind"]): DetonationFileOp
 function unescapeTraceString(value: string): string {
   return value.replace(
     /\\(\\|"|n|t|r|0|x[0-9a-fA-F]{2}|[0-7]{1,3})/gu,
-    (_, escape: string) => {
-      if (escape === "\\") return "\\";
-      if (escape === '"') return '"';
-      if (escape === "n") return "\n";
-      if (escape === "t") return "\t";
-      if (escape === "r") return "\r";
-      if (escape === "0") return "\0";
-      if (escape.startsWith("x")) return String.fromCharCode(parseInt(escape.slice(1), 16));
-      return String.fromCharCode(parseInt(escape, 8));
+    (_, escapeSequence: string) => {
+      if (escapeSequence === "\\") return "\\";
+      if (escapeSequence === '"') return '"';
+      if (escapeSequence === "n") return "\n";
+      if (escapeSequence === "t") return "\t";
+      if (escapeSequence === "r") return "\r";
+      if (escapeSequence === "0") return "\0";
+      if (escapeSequence.startsWith("x")) {
+        return String.fromCharCode(parseInt(escapeSequence.slice(1), 16));
+      }
+      return String.fromCharCode(parseInt(escapeSequence, 8));
     },
   );
 }
@@ -620,7 +634,12 @@ function toDomain(url: string): string | undefined {
 }
 
 function sanitizeArtifactFilename(value: string): string {
-  return value.replace(/[^a-zA-Z0-9._-]+/gu, "_").replace(/^_+/u, "").slice(0, 120) || "artifact";
+  return (
+    value
+      .replace(/[^a-zA-Z0-9._-]+/gu, "_")
+      .replace(/^_+/u, "")
+      .slice(0, 120) || "artifact"
+  );
 }
 
 function dedupeTelemetry(events: DetonationTelemetryEvent[]): DetonationTelemetryEvent[] {
@@ -636,8 +655,12 @@ function dedupeTelemetry(events: DetonationTelemetryEvent[]): DetonationTelemetr
       event.process
         ? `${event.process.command}:${event.process.args.join(",")}:${event.process.exitCode ?? ""}`
         : "",
-      event.network ? `${event.network.protocol}:${event.network.address}:${event.network.port}` : "",
-      event.file ? `${event.file.operation}:${event.file.path}:${event.file.contentHash ?? ""}` : "",
+      event.network
+        ? `${event.network.protocol}:${event.network.address}:${event.network.port}`
+        : "",
+      event.file
+        ? `${event.file.operation}:${event.file.path}:${event.file.contentHash ?? ""}`
+        : "",
       event.memory
         ? `${event.memory.name}:${event.memory.beforeHash}:${event.memory.afterHash}`
         : "",

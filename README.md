@@ -29,6 +29,29 @@ pnpm typecheck
 pnpm test
 ```
 
+## Install
+
+Install the publishable root artifact with:
+
+```bash
+npm install -g clawguard
+```
+
+For a foreground daemon session on a clean machine:
+
+```bash
+clawguard daemon
+clawguard status
+```
+
+For the macOS `launchd` user-service flow:
+
+```bash
+clawguard service install
+clawguard service status
+clawguard service uninstall
+```
+
 ## Release preflight
 
 Run the launch-hardening preflight before cutting a release candidate:
@@ -37,14 +60,31 @@ Run the launch-hardening preflight before cutting a release candidate:
 pnpm release:check
 ```
 
-This runs lint, format checks, build, typecheck, tests, and a smoke pass that boots the built daemon on a temporary socket and queries it through the built CLI.
+This runs lint, format checks, typechecks, workspace tests, the repo-built smoke pass, then builds the publishable root artifact, packs it into `.release/`, installs that tarball into a clean temp prefix, boots the installed daemon through `clawguard daemon`, and queries it through the installed CLI.
+
+Create the publishable artifact directly with:
+
+```bash
+pnpm release:pack
+pnpm release:smoke:install
+```
 
 ## Operator flow
 
-Use the built daemon and CLI directly during packaging or local operator validation:
+After install, use the packaged CLI directly:
 
 ```bash
-node apps/daemon/dist/index.js
+clawguard daemon
+clawguard status
+clawguard service install
+clawguard service status
+clawguard service uninstall
+```
+
+During repo development, the same commands remain available through the built app entrypoints:
+
+```bash
+node apps/cli/dist/index.js daemon
 node apps/cli/dist/index.js status
 node apps/cli/dist/index.js service install
 node apps/cli/dist/index.js service status

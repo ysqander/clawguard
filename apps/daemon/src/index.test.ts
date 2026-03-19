@@ -89,6 +89,39 @@ class FailingWatcher implements FileWatcher {
   }
 }
 
+class MissingRootWatcher implements FileWatcher {
+  private readonly handlersByDirectory = new Map<string, WatchHandlers>();
+  private readonly availableDirectories = new Set<string>();
+
+  markAvailable(directoryPath: string): void {
+    this.availableDirectories.add(directoryPath);
+  }
+
+  async watchDirectory(
+    directoryPath: string,
+    handlers: WatchHandlers,
+    _options?: { recursive?: boolean },
+  ): Promise<WatchSubscription> {
+    if (!this.availableDirectories.has(directoryPath)) {
+      throw createMissingWatchRootError(directoryPath);
+    }
+
+    this.handlersByDirectory.set(directoryPath, handlers);
+
+    return {
+      close: async () => {
+        this.handlersByDirectory.delete(directoryPath);
+      },
+    };
+  }
+}
+
+function createMissingWatchRootError(directoryPath: string): Error {
+  return Object.assign(new Error(`ENOENT: no such file or directory, watch '${directoryPath}'`), {
+    code: "ENOENT",
+  });
+}
+
 async function pathExists(targetPath: string): Promise<boolean> {
   try {
     await access(targetPath, constants.F_OK);
@@ -413,7 +446,47 @@ test("status degrades when watcher startup fails", async (t) => {
 
   assert.equal(data.state, "degraded");
   assert.equal(data.watcher, "degraded");
-  assert.equal(data.issues?.some((issue) => issue.includes("Watcher watch-start failed")), true);
+  assert.equal(
+    data.issues?.some((issue) => issue.includes("Watcher watch-start failed")),
+    true,
+  );
+});
+
+test("status stays idle when watcher startup is waiting for a missing skill root", async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), "clawguard-daemon-test-"));
+  const skillsRoot = path.join(root, "skills");
+  const socketPath = path.join(root, "clawguard-daemon.sock");
+  const daemon = new DaemonServer({
+    socketPath,
+    startWatcher: true,
+    platformAdapter: createTestPlatformAdapter(new MissingRootWatcher()),
+    workspaceModel: createWorkspaceModel(skillsRoot),
+    watcherRetryDelayMs: 10,
+    storagePaths: {
+      stateDbPath: path.join(root, "state.db"),
+      artifactsRoot: path.join(root, "artifacts"),
+    },
+  });
+  await daemon.start();
+
+  t.after(async () => {
+    await daemon.stop().catch(() => {});
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  const status = await waitForStatus(
+    socketPath,
+    (current) =>
+      current.watcher === "running" &&
+      (current.issues?.some((issue) => issue.includes("waiting for missing skill root")) ?? false),
+  );
+
+  assert.equal(status.state, "idle");
+  assert.equal(status.watcher, "running");
+  assert.equal(
+    status.issues?.some((issue) => issue.includes("Watcher watch-start failed")),
+    false,
+  );
 });
 
 test("status clears watcher degradation after a transient startup failure recovers", async (t) => {
@@ -450,6 +523,47 @@ test("status clears watcher degradation after a transient startup failure recove
   const recoveredStatus = await waitForStatus(socketPath, (status) => status.watcher === "running");
   assert.equal(recoveredStatus.state, "idle");
   assert.deepEqual(recoveredStatus.issues, []);
+});
+
+test("missing watcher roots clear their informational issue after the path appears", async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), "clawguard-daemon-test-"));
+  const skillsRoot = path.join(root, "skills");
+  const socketPath = path.join(root, "clawguard-daemon.sock");
+  const watcher = new MissingRootWatcher();
+  const daemon = new DaemonServer({
+    socketPath,
+    startWatcher: true,
+    platformAdapter: createTestPlatformAdapter(watcher),
+    workspaceModel: createWorkspaceModel(skillsRoot),
+    watcherRetryDelayMs: 10,
+    storagePaths: {
+      stateDbPath: path.join(root, "state.db"),
+      artifactsRoot: path.join(root, "artifacts"),
+    },
+  });
+  await daemon.start();
+
+  t.after(async () => {
+    await daemon.stop().catch(() => {});
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  const waitingStatus = await waitForStatus(
+    socketPath,
+    (status) =>
+      status.watcher === "running" &&
+      (status.issues?.some((issue) => issue.includes("waiting for missing skill root")) ?? false),
+  );
+  assert.equal(waitingStatus.state, "idle");
+
+  await mkdir(skillsRoot, { recursive: true });
+  watcher.markAvailable(skillsRoot);
+
+  const recoveredStatus = await waitForStatus(
+    socketPath,
+    (status) => status.watcher === "running" && (status.issues?.length ?? 0) === 0,
+  );
+  assert.equal(recoveredStatus.state, "idle");
 });
 
 test("scan leaves benign skills in place", async (t) => {
@@ -616,8 +730,10 @@ test("notification delivery failures are reported without degrading watcher heal
     skillPath,
   });
 
-  const status = await waitForStatus(socketPath, (current) =>
-    current.issues?.some((issue) => issue.includes("Notification delivery failed")) ?? false,
+  const status = await waitForStatus(
+    socketPath,
+    (current) =>
+      current.issues?.some((issue) => issue.includes("Notification delivery failed")) ?? false,
   );
 
   assert.equal(status.state, "idle");

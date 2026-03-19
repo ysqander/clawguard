@@ -280,7 +280,11 @@ test("runSandboxCommand forwards timeout options to the runtime provider", async
     assert.equal(observedArgs.includes("--cap-add=SYS_PTRACE"), true);
     const seccompIndex = observedArgs.indexOf("seccomp=unconfined");
     assert.ok(seccompIndex > 0, "seccomp=unconfined should be present in args");
-    assert.equal(observedArgs[seccompIndex - 1], "--security-opt", "seccomp=unconfined should follow --security-opt");
+    assert.equal(
+      observedArgs[seccompIndex - 1],
+      "--security-opt",
+      "seccomp=unconfined should follow --security-opt",
+    );
   } finally {
     await environment.cleanup();
   }

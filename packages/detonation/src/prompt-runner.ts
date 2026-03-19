@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { Dirent } from "node:fs";
 import { lstat, readFile, readdir, readlink } from "node:fs/promises";
 import path from "node:path";
 
@@ -389,7 +390,9 @@ async function computeFileChanges(
   const containerPaths = new Set([...baseline.keys(), ...current.keys()]);
   const changes: PromptRunnerFileChange[] = [];
 
-  for (const containerPath of [...containerPaths].sort((left, right) => left.localeCompare(right))) {
+  for (const containerPath of [...containerPaths].sort((left, right) =>
+    left.localeCompare(right),
+  )) {
     const before = baseline.get(containerPath);
     const after = current.get(containerPath);
     if (before && !after) {
@@ -854,7 +857,11 @@ function buildTracedInvocation(
       "-e",
       "trace=execve,process,file,network",
       "-o",
-      path.posix.join(environment.container.workspaceDir, TRACE_DIRECTORY_RELATIVE_PATH, `${stepId}.trace`),
+      path.posix.join(
+        environment.container.workspaceDir,
+        TRACE_DIRECTORY_RELATIVE_PATH,
+        `${stepId}.trace`,
+      ),
       invocation.command,
       ...invocation.args,
     ],
@@ -894,7 +901,7 @@ async function collectStepTrace(
   environment: PreparedDetonationEnvironment,
 ): Promise<PromptRunnerStepTrace | undefined> {
   const traceDirectory = path.join(environment.host.workspaceDir, TRACE_DIRECTORY_RELATIVE_PATH);
-  let entries;
+  let entries: Dirent[];
   try {
     entries = await readdir(traceDirectory, { withFileTypes: true });
   } catch {
@@ -926,7 +933,7 @@ async function collectFileSnapshots(
 
   async function visit(relativePath = ""): Promise<void> {
     const directoryPath = path.join(rootDir, relativePath);
-    let entries;
+    let entries: Dirent[];
     try {
       entries = await readdir(directoryPath, { withFileTypes: true });
     } catch {
@@ -934,7 +941,8 @@ async function collectFileSnapshots(
     }
 
     for (const entry of entries) {
-      const childRelativePath = relativePath.length > 0 ? path.join(relativePath, entry.name) : entry.name;
+      const childRelativePath =
+        relativePath.length > 0 ? path.join(relativePath, entry.name) : entry.name;
       const childPosixPath = childRelativePath.split(path.sep).join(path.posix.sep);
       if (childPosixPath === ".clawguard" || childPosixPath.startsWith(".clawguard/")) {
         continue;
@@ -946,7 +954,10 @@ async function collectFileSnapshots(
         continue;
       }
 
-      const snapshot = await readFileSnapshot(childHostPath, path.posix.join(containerRoot, childPosixPath));
+      const snapshot = await readFileSnapshot(
+        childHostPath,
+        path.posix.join(containerRoot, childPosixPath),
+      );
       if (snapshot) {
         snapshots.set(snapshot.containerPath, snapshot);
       }
@@ -1002,7 +1013,12 @@ function hashText(value: string): string {
   return hashBuffer(Buffer.from(value, "utf8"));
 }
 
-function createUnifiedDiff(beforeLabel: string, afterLabel: string, before: string, after: string): string {
+function createUnifiedDiff(
+  beforeLabel: string,
+  afterLabel: string,
+  before: string,
+  after: string,
+): string {
   if (before === after) {
     return "";
   }

@@ -10,7 +10,10 @@ import {
   runDetonationBenchmarkCli,
   type DetonationBenchmarkExecutionResult,
 } from "./benchmark-detonation.js";
-import type { CreateDetonationRuntimeProviderOptions, DetonationRuntimeProvider } from "./runtime-provider.js";
+import type {
+  CreateDetonationRuntimeProviderOptions,
+  DetonationRuntimeProvider,
+} from "./runtime-provider.js";
 
 function createRuntimeDetector(runtime?: DetectedContainerRuntime): ContainerRuntimeDetector {
   return {
@@ -88,7 +91,9 @@ test("runDetonationBenchmark covers every detonation fixture with execution metr
     fixtures.map((fixture) => fixture.id).sort((left, right) => left.localeCompare(right)),
   );
   assert.ok(summary.rows.every((row) => row.status === "completed"));
-  assert.ok(summary.rows.some((row) => row.intent === "malicious" && (row.fileChangeCount ?? 0) > 0));
+  assert.ok(
+    summary.rows.some((row) => row.intent === "malicious" && (row.fileChangeCount ?? 0) > 0),
+  );
   assert.ok(summary.rows.some((row) => row.intent === "benign" && row.fileChangeCount === 0));
 });
 
@@ -112,9 +117,7 @@ test("runDetonationBenchmark treats non-throwing failed steps as execution failu
         memoryChangeCount: 0,
         fileChangeCount: 0,
         triggeredActionCount: 1,
-        ...(fixture.id === "malicious-staged-download"
-          ? { errorMessage: "workflow failed" }
-          : {}),
+        ...(fixture.id === "malicious-staged-download" ? { errorMessage: "workflow failed" } : {}),
       };
     },
   });
@@ -215,27 +218,23 @@ test("runDetonationBenchmarkCli returns a non-zero exit code for non-throwing ex
     command: "podman",
   } satisfies DetectedContainerRuntime;
 
-  const result = await runDetonationBenchmarkCli(
-    {},
-    createRuntimeDetector(runtime),
-    {
-      async createRuntimeProvider() {
-        return createStubProvider();
-      },
-      async runFixture() {
-        return {
-          setupCommandCount: 0,
-          failedStepCount: 1,
-          telemetryCount: 1,
-          artifactCount: 1,
-          memoryChangeCount: 0,
-          fileChangeCount: 0,
-          triggeredActionCount: 1,
-          errorMessage: "workflow failed",
-        };
-      },
+  const result = await runDetonationBenchmarkCli({}, createRuntimeDetector(runtime), {
+    async createRuntimeProvider() {
+      return createStubProvider();
     },
-  );
+    async runFixture() {
+      return {
+        setupCommandCount: 0,
+        failedStepCount: 1,
+        telemetryCount: 1,
+        artifactCount: 1,
+        memoryChangeCount: 0,
+        fileChangeCount: 0,
+        triggeredActionCount: 1,
+        errorMessage: "workflow failed",
+      };
+    },
+  });
 
   assert.equal(result.exitCode, 1);
   assert.equal(result.summary.passed, false);

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   DEFAULT_DAEMON_SERVICE_LABEL,
+  buildDaemonLaunchCommand,
   buildDaemonServiceDefinition,
   formatServiceCommandResult,
   getDaemonServiceStatus,
@@ -12,19 +13,23 @@ import {
   type ServiceDefinitionLike,
   type ServiceStatusLike,
 } from "./service-commands.js";
+import { resolveDefaultServiceWorkingDirectory } from "./install-layout.js";
 
-function createServiceStatus(overrides: {
-  label?: string;
-  plistPath?: string;
-  installed?: boolean;
-  loaded?: boolean;
-  running?: boolean;
-  pid?: number;
-  lastExitCode?: number;
-} = {}): ServiceStatusLike {
+function createServiceStatus(
+  overrides: {
+    label?: string;
+    plistPath?: string;
+    installed?: boolean;
+    loaded?: boolean;
+    running?: boolean;
+    pid?: number;
+    lastExitCode?: number;
+  } = {},
+): ServiceStatusLike {
   return {
     label: overrides.label ?? DEFAULT_DAEMON_SERVICE_LABEL,
-    plistPath: overrides.plistPath ?? "/Users/tester/Library/LaunchAgents/com.clawguard.daemon.plist",
+    plistPath:
+      overrides.plistPath ?? "/Users/tester/Library/LaunchAgents/com.clawguard.daemon.plist",
     installed: overrides.installed ?? true,
     loaded: overrides.loaded ?? true,
     running: overrides.running ?? true,
@@ -34,7 +39,9 @@ function createServiceStatus(overrides: {
 }
 
 function createClient(handlers: {
-  installService?(definition: ServiceDefinitionLike): Promise<ServiceStatusLike> | ServiceStatusLike;
+  installService?(
+    definition: ServiceDefinitionLike,
+  ): Promise<ServiceStatusLike> | ServiceStatusLike;
   uninstallService?(label: string): Promise<void> | void;
   getServiceStatus?(label: string): Promise<ServiceStatusLike> | ServiceStatusLike;
 }): ServiceCommandsClient {
@@ -74,13 +81,21 @@ test("buildDaemonServiceDefinition resolves the daemon entrypoint relative to th
   assert.equal(definition.workingDirectory, "/Users/tester/clawguard");
   assert.equal(definition.runAtLoad, true);
   assert.equal(definition.keepAlive, true);
-  assert.match(definition.args?.[1] ?? "", /apps\/daemon\/dist\/index\.js$/u);
+  assert.match(definition.args?.[1] ?? "", /(apps\/daemon\/dist\/index|dist\/daemon)\.js$/u);
 });
 
-test("buildDaemonServiceDefinition defaults the working directory to the current cwd", () => {
+test("buildDaemonLaunchCommand defaults to the current node executable and stable working directory", () => {
+  const launch = buildDaemonLaunchCommand();
+
+  assert.equal(launch.program, process.execPath);
+  assert.deepEqual(launch.args, ["--enable-source-maps", launch.args[1]]);
+  assert.equal(launch.workingDirectory, resolveDefaultServiceWorkingDirectory());
+});
+
+test("buildDaemonServiceDefinition defaults the working directory to HOME", () => {
   const definition = buildDaemonServiceDefinition();
 
-  assert.equal(definition.workingDirectory, process.cwd());
+  assert.equal(definition.workingDirectory, resolveDefaultServiceWorkingDirectory());
   assert.equal(definition.runAtLoad, true);
   assert.equal(definition.keepAlive, true);
 });
@@ -90,8 +105,11 @@ test("installDaemonService returns the installed service status and definition",
     installService: (definition) => {
       assert.equal(definition.label, DEFAULT_DAEMON_SERVICE_LABEL);
       assert.equal(definition.program, "/usr/local/bin/node");
-      assert.deepEqual(definition.args, ["--enable-source-maps", "/repo/apps/daemon/dist/index.js"]);
-      assert.equal(definition.workingDirectory, process.cwd());
+      assert.deepEqual(definition.args, [
+        "--enable-source-maps",
+        "/repo/apps/daemon/dist/index.js",
+      ]);
+      assert.equal(definition.workingDirectory, resolveDefaultServiceWorkingDirectory());
       assert.equal(definition.runAtLoad, true);
       assert.equal(definition.keepAlive, true);
       return createServiceStatus({ plistPath: "/tmp/com.clawguard.daemon.plist" });

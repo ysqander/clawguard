@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { mkdirSync, rmSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   daemonRequestEnvelopeValidator,
@@ -69,6 +71,7 @@ export class DaemonServer {
   private readonly watcherDebounceMs: number | undefined;
   private readonly watcherRetryDelayMs: number | undefined;
   private readonly watcherIssuesByRoot = new Map<string, string>();
+  private readonly watcherUnavailableRootsByPath = new Map<string, string>();
   private readonly warningIssues: string[] = [];
   private watcherStartupIssue: string | undefined;
   private watcherPipeline: SkillWatcherPipeline | undefined;
@@ -79,7 +82,9 @@ export class DaemonServer {
     this.startWatcher = options.startWatcher ?? true;
     this.storage = createStorage(options.storagePaths);
     this.lifecycle = new SkillLifecycleManager({ storage: this.storage });
-    this.platform = this.startWatcher ? (options.platformAdapter ?? createPlatformAdapter()) : undefined;
+    this.platform = this.startWatcher
+      ? (options.platformAdapter ?? createPlatformAdapter())
+      : undefined;
     this.workspaceModel = options.workspaceModel;
     this.watcherDebounceMs = options.watcherDebounceMs;
     this.watcherRetryDelayMs = options.watcherRetryDelayMs;
@@ -160,7 +165,9 @@ export class DaemonServer {
           this.recordWatcherIssue(error, context);
         },
         ...(this.watcherDebounceMs !== undefined ? { debounceMs: this.watcherDebounceMs } : {}),
-        ...(this.watcherRetryDelayMs !== undefined ? { retryDelayMs: this.watcherRetryDelayMs } : {}),
+        ...(this.watcherRetryDelayMs !== undefined
+          ? { retryDelayMs: this.watcherRetryDelayMs }
+          : {}),
       });
       await this.watcherPipeline.start();
     } catch (error) {
@@ -196,7 +203,10 @@ export class DaemonServer {
         case "status":
           return this.successResponse(request.requestId, this.buildStatusResponse());
         case "scan": {
-          const result = await this.enqueueScan(request.payload.skillPath, request.payload.skillPath);
+          const result = await this.enqueueScan(
+            request.payload.skillPath,
+            request.payload.skillPath,
+          );
           return this.successResponse(request.requestId, {
             scan: result.scan,
             ...(result.report ? { report: result.report } : {}),
@@ -227,22 +237,22 @@ export class DaemonServer {
             );
           }
 
-          await (
-            request.payload.command === "allow"
-              ? this.lifecycle.applyOperatorAllow({
-                  skillSlug: report.report.snapshot.slug,
-                  contentHash: report.report.snapshot.contentHash,
-                  ...(request.payload.reason ? { reason: request.payload.reason } : {}),
-                })
-              : this.lifecycle.applyOperatorBlock({
-                  skillSlug: report.report.snapshot.slug,
-                  contentHash: report.report.snapshot.contentHash,
-                  skillPath: report.report.snapshot.path,
-                  ...(request.payload.reason ? { reason: request.payload.reason } : {}),
-                })
-          );
+          await (request.payload.command === "allow"
+            ? this.lifecycle.applyOperatorAllow({
+                skillSlug: report.report.snapshot.slug,
+                contentHash: report.report.snapshot.contentHash,
+                ...(request.payload.reason ? { reason: request.payload.reason } : {}),
+              })
+            : this.lifecycle.applyOperatorBlock({
+                skillSlug: report.report.snapshot.slug,
+                contentHash: report.report.snapshot.contentHash,
+                skillPath: report.report.snapshot.path,
+                ...(request.payload.reason ? { reason: request.payload.reason } : {}),
+              }));
 
-          const refreshedReport = await this.storage.getLatestStaticReportBySlug(request.payload.slug);
+          const refreshedReport = await this.storage.getLatestStaticReportBySlug(
+            request.payload.slug,
+          );
           if (!refreshedReport) {
             throw new Error(`No static report found for slug ${request.payload.slug} after update`);
           }
@@ -421,6 +431,16 @@ export class DaemonServer {
   }
 
   private recordWatcherIssue(error: Error, context: SkillWatcherPipelineErrorContext): void {
+    if (isMissingWatchRootError(error)) {
+      this.watcherIssuesByRoot.delete(context.skillRootPath);
+      this.watcherUnavailableRootsByPath.set(
+        context.skillRootPath,
+        `Watcher waiting for missing skill root ${context.skillRootPath} to appear.`,
+      );
+      return;
+    }
+
+    this.watcherUnavailableRootsByPath.delete(context.skillRootPath);
     const message = `Watcher ${context.phase} failed for ${context.skillRootPath}: ${error.message}`;
 
     if (context.phase === "watch-start" || context.phase === "watch-runtime") {
@@ -433,6 +453,7 @@ export class DaemonServer {
 
   private clearWatcherIssue(context: SkillWatcherPipelineWatchContext): void {
     this.watcherIssuesByRoot.delete(context.skillRootPath);
+    this.watcherUnavailableRootsByPath.delete(context.skillRootPath);
   }
 
   private recordWatcherStartupIssue(message: string): void {
@@ -450,6 +471,7 @@ export class DaemonServer {
     return [
       ...(this.watcherStartupIssue !== undefined ? [this.watcherStartupIssue] : []),
       ...this.watcherIssuesByRoot.values(),
+      ...this.watcherUnavailableRootsByPath.values(),
       ...this.warningIssues,
     ];
   }
@@ -534,10 +556,22 @@ export async function startDaemon(options: StartDaemonOptions = {}): Promise<str
   return `clawguard daemon listening on ${daemon.getSocketPath()}`;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isEntrypoint =
+  process.argv[1] !== undefined &&
+  resolveEntrypointPath(fileURLToPath(import.meta.url)) === resolveEntrypointPath(process.argv[1]);
+
+if (isEntrypoint) {
   const daemon = new DaemonServer();
   await daemon.start();
   console.log(`clawguard daemon listening on ${daemon.getSocketPath()}`);
+}
+
+function resolveEntrypointPath(filePath: string): string {
+  try {
+    return realpathSync(path.resolve(filePath));
+  } catch {
+    return path.resolve(filePath);
+  }
 }
 
 function toNotificationRecommendation(
@@ -551,4 +585,11 @@ function toNotificationRecommendation(
     case "unknown":
       return "review";
   }
+}
+
+function isMissingWatchRootError(error: Error): boolean {
+  return (
+    ("code" in error && error.code === "ENOENT") ||
+    error.message.includes("ENOENT: no such file or directory")
+  );
 }

@@ -152,11 +152,9 @@ export function buildPayload(command: string, args: string[]): DaemonRequestPayl
       };
     }
     case "detonate": {
-      const slug = args[0];
-      if (!slug) {
-        throw new Error("Usage: clawguard detonate <slug>");
-      }
-      return { command: "detonate", slug };
+      throw new Error(
+        "Detonation is not available in this release. Use clawguard scan <skill-path> and clawguard report <slug> instead.",
+      );
     }
     default:
       throw new Error(`Unknown command: ${command}`);
@@ -308,17 +306,7 @@ export function formatConnectionError(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown CLI failure";
 }
 
-function formatDaemonError(payload: DaemonRequestPayload, response: DaemonErrorResponse): string {
-  if (payload.command === "detonate" && response.error.code === "not_implemented") {
-    return [
-      "Detonation orchestration is not available yet (planned for Milestone B).",
-      "You can still run static-path triage now:",
-      "- clawguard scan <skill-path>",
-      `- clawguard report ${payload.slug}`,
-      "Use allow/block to resolve quarantine decisions after review.",
-    ].join("\n");
-  }
-
+function formatDaemonError(_payload: DaemonRequestPayload, response: DaemonErrorResponse): string {
   return `error (${response.error.code}): ${response.error.message}`;
 }
 
@@ -346,7 +334,6 @@ function getHelpText(): string {
     "  clawguard report <slug> [--detailed]",
     "  clawguard allow <slug> [reason] [--detailed]",
     "  clawguard block <slug> [reason] [--detailed]",
-    "  clawguard detonate <slug>",
     "  clawguard service install",
     "  clawguard service status",
     "  clawguard service uninstall",

@@ -31,11 +31,11 @@ test("buildPayload parses static-path commands", () => {
   });
 });
 
-test("buildPayload keeps detonate command on CLI surface", () => {
-  assert.deepEqual(buildPayload("detonate", ["calendar-helper"]), {
-    command: "detonate",
-    slug: "calendar-helper",
-  });
+test("buildPayload rejects detonate because it is hidden from the release CLI", () => {
+  assert.throws(
+    () => buildPayload("detonate", ["calendar-helper"]),
+    /Detonation is not available in this release/u,
+  );
 });
 
 test("buildCommand parses direct service-management commands", () => {
@@ -61,7 +61,7 @@ test("buildPayload throws actionable usage errors", () => {
   assert.throws(() => buildPayload("report", []), /Usage: clawguard report <slug>/);
   assert.throws(() => buildPayload("allow", []), /Usage: clawguard allow <slug> \[reason\]/);
   assert.throws(() => buildPayload("block", []), /Usage: clawguard block <slug> \[reason\]/);
-  assert.throws(() => buildPayload("detonate", []), /Usage: clawguard detonate <slug>/);
+  assert.throws(() => buildPayload("detonate", []), /Detonation is not available in this release/u);
   assert.throws(() => buildPayload("unknown", []), /Unknown command: unknown/);
   assert.throws(
     () => buildCommand("service", []),

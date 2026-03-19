@@ -294,8 +294,10 @@ export class SkillLifecycleManager {
       (record) => record.skillSlug === skillSlug && record.state !== "deleted",
     );
 
-    return matching.find((record) => record.state === "active") ??
-      matching.find((record) => record.state === "restored");
+    return (
+      matching.find((record) => record.state === "active") ??
+      matching.find((record) => record.state === "restored")
+    );
   }
 }
 

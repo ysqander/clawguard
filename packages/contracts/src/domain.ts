@@ -617,7 +617,11 @@ function parseDetonationTelemetryEvent(input: unknown, path: string): Detonation
       record.memory,
       (value, currentPath) =>
         parseObject(value, currentPath, (memoryRecord) => ({
-          name: parseEnum(memoryRecord.name, ["memory", "soul", "user"] as const, `${currentPath}.name`),
+          name: parseEnum(
+            memoryRecord.name,
+            ["memory", "soul", "user"] as const,
+            `${currentPath}.name`,
+          ),
           beforeHash: parseNonEmptyString(memoryRecord.beforeHash, `${currentPath}.beforeHash`),
           afterHash: parseNonEmptyString(memoryRecord.afterHash, `${currentPath}.afterHash`),
         })),
