@@ -1,27 +1,167 @@
 # ClawGuard
 
-ClawGuard is a local-first skill auditor for OpenClaw agents. This repository is structured as a `pnpm` monorepo from day one so the scanner, daemon, detonation runtime, reporting pipeline, and platform adapters can evolve independently without collapsing into one package.
+ClawGuard is a local-first skill auditor for OpenClaw agents.
 
-ClawGuard answers "should this skill be present on the machine?" It does not act as a runtime tool-call authorization layer.
+It answers one question:
 
-## Workspace layout
+> Should this skill be present on the machine?
 
-- `apps/cli`: user-facing `clawguard` commands
-- `apps/daemon`: long-running daemon and orchestration loop
-- `packages/contracts`: shared schemas and TypeScript contracts
-- `packages/platform`: OS/runtime abstraction layer
-- `packages/storage`: SQLite and artifact-store abstractions
-- `packages/discovery`: OpenClaw detection and watcher entrypoints
-- `packages/integrations`: ClawHub and VirusTotal clients
-- `packages/scanner`: static analysis and scoring
-- `packages/detonation`: Podman-first detonation runtime
-- `packages/reports`: evidence normalization and report assembly
-- `packages/fixtures`: reusable benign/malicious fixtures and benchmark inputs
+ClawGuard is not a runtime tool-call authorization layer. It focuses on pre-install and post-detection analysis of local skills through static analysis, behavioral detonation, reporting, quarantine, and operator review.
 
-## Getting started
+## Status
+
+- `0.1.0`
+- macOS-first
+- local-first
+- Podman-first detonation runtime, with Docker compatibility
+
+## What It Does
+
+- Discovers OpenClaw skill roots from local configuration.
+- Watches local skill directories for changes.
+- Runs static analysis against skill contents and setup scripts.
+- Quarantines suspicious skills.
+- Runs behavioral detonation in a sandbox for manual and automatic follow-up analysis.
+- Stores scan history, reports, and evidence artifacts locally.
+- Exposes a CLI plus a local daemon for ongoing monitoring.
+
+## Requirements
+
+- Node `>=22`
+- `pnpm` for repo development
+- macOS for the current service-management flow
+- Podman recommended for detonation
+- Docker supported as a compatibility runtime for detonation
+
+## Installation
+
+Install the published CLI:
+
+```bash
+npm install -g clawguard
+```
+
+Start the daemon in the foreground:
+
+```bash
+clawguard daemon
+```
+
+In another terminal:
+
+```bash
+clawguard status
+```
+
+## Quick Start
+
+Scan a local skill by path:
+
+```bash
+clawguard scan /path/to/skill --detailed
+```
+
+Read the latest report for a known slug:
+
+```bash
+clawguard report my-skill --detailed
+```
+
+Run behavioral detonation for a locally installed skill:
+
+```bash
+clawguard detonate my-skill --detailed
+```
+
+Review recent scan activity:
+
+```bash
+clawguard audit
+```
+
+## CLI Commands
+
+### `clawguard daemon`
+
+Starts the local ClawGuard daemon in the foreground.
+
+Use this for local testing, debugging, or when you do not want to install the macOS user service.
+
+### `clawguard status`
+
+Shows daemon health, active job count, watcher state, and any operator-visible issues.
+
+### `clawguard scan <skill-path> [--detailed]`
+
+Runs an immediate static scan on a skill directory.
+
+- `--detailed` adds the full rendered report.
+- Suspicious results may trigger quarantine.
+- High-risk static results may also enqueue automatic detonation.
+
+### `clawguard report <slug> [--detailed]`
+
+Shows the unified operator view for a skill slug.
+
+This is the main read path after a scan. It includes:
+
+- the latest static report
+- the latest detonation status
+- the latest completed detonation report when one exists
+
+### `clawguard detonate <slug> [--detailed]`
+
+Runs behavioral detonation for a locally installed skill that ClawGuard can resolve from discovered OpenClaw roots.
+
+- This is a manual operator action.
+- It returns a behavioral report on success.
+- If no supported runtime is available, it returns a clear runtime error instead of failing silently.
+
+### `clawguard allow <slug> [reason] [--detailed]`
+
+Records an operator allow decision for the latest known result for that slug.
+
+### `clawguard block <slug> [reason] [--detailed]`
+
+Records an operator block decision and keeps the skill out of the normal install path.
+
+### `clawguard audit`
+
+Lists recent scans from local history.
+
+### `clawguard service install|status|uninstall`
+
+Manages the macOS `launchd` user service for the ClawGuard daemon.
+
+Typical flow:
+
+```bash
+clawguard service install
+clawguard service status
+clawguard service uninstall
+```
+
+## Example Operator Flow
+
+```bash
+clawguard daemon
+clawguard status
+clawguard scan ~/.openclaw/workspace/skills/example-skill --detailed
+clawguard report example-skill --detailed
+clawguard detonate example-skill --detailed
+```
+
+## Development
+
+Install dependencies:
 
 ```bash
 pnpm install
+```
+
+Run the standard local checks:
+
+```bash
 pnpm lint
 pnpm format:check
 pnpm build
@@ -29,133 +169,82 @@ pnpm typecheck
 pnpm test
 ```
 
-## Install
-
-Install the publishable root artifact with:
+Run the built CLI and daemon directly from the repo:
 
 ```bash
-npm install -g clawguard
+node apps/cli/dist/index.js status
+node apps/cli/dist/index.js daemon
 ```
 
-For a foreground daemon session on a clean machine:
+## Monorepo Layout
 
-```bash
-clawguard daemon
-clawguard status
-```
+- `apps/cli`: user-facing `clawguard` command
+- `apps/daemon`: daemon and orchestration loop
+- `packages/contracts`: shared schemas and payloads
+- `packages/platform`: OS/runtime abstraction layer
+- `packages/storage`: SQLite and artifact store
+- `packages/discovery`: OpenClaw discovery and watcher pipeline
+- `packages/integrations`: ClawHub and VirusTotal clients
+- `packages/scanner`: static analysis and scoring
+- `packages/detonation`: sandbox runtime and telemetry capture
+- `packages/reports`: report assembly and rendering
+- `packages/fixtures`: benign and malicious test fixtures
 
-For the macOS `launchd` user-service flow:
+## Release Validation
 
-```bash
-clawguard service install
-clawguard service status
-clawguard service uninstall
-```
-
-## Release preflight
-
-Run the launch-hardening preflight before cutting a release candidate:
+Run the release gate before publishing:
 
 ```bash
 pnpm release:check
 ```
 
-This runs lint, format checks, typechecks, workspace tests, the repo-built smoke pass, then builds the publishable root artifact, packs it into `.release/`, installs that tarball into a clean temp prefix, boots the installed daemon through `clawguard daemon`, and queries it through the installed CLI.
-The smoke pass also creates a local skill under a discovered root and exercises `clawguard detonate <slug>`, accepting either a completed behavioral run or a clear `runtime_unavailable` result when Podman/Docker is absent.
+This covers:
 
-Create the publishable artifact directly with:
+- lint
+- format check
+- typecheck
+- workspace tests
+- repo-built smoke validation
+- packaged tarball install smoke validation
+
+Build the publishable tarball directly:
 
 ```bash
 pnpm release:pack
 pnpm release:smoke:install
 ```
 
-## Operator flow
+## Benchmarks
 
-After install, use the packaged CLI directly:
-
-```bash
-clawguard daemon
-clawguard status
-clawguard scan /path/to/skill --detailed
-clawguard report <slug> --detailed
-clawguard detonate <slug> --detailed
-clawguard service install
-clawguard service status
-clawguard service uninstall
-```
-
-During repo development, the same commands remain available through the built app entrypoints:
-
-```bash
-node apps/cli/dist/index.js daemon
-node apps/cli/dist/index.js status
-node apps/cli/dist/index.js scan /path/to/skill --detailed
-node apps/cli/dist/index.js report <slug> --detailed
-node apps/cli/dist/index.js detonate <slug> --detailed
-node apps/cli/dist/index.js service install
-node apps/cli/dist/index.js service status
-node apps/cli/dist/index.js service uninstall
-```
-
-`report <slug>` is the unified operator view. It always shows the latest static report and, when available, the latest detonation status and behavioral report for the same slug. Suspicious static scans automatically enqueue detonation after the static decision/quarantine path finishes. `detonate <slug>` also works as a manual operator command for locally installed skills under discovered roots.
-
-The `service` commands target the macOS `launchd` user service flow added in `CG-019`.
-
-## Security caveats
-
-- Podman is the default detonation runtime. Docker remains a compatibility adapter, not the primary path.
-- VirusTotal and ClawHub are enrichment signals. A clean lookup is not proof that a skill is safe.
-- Detonation reduces risk by exercising setup and workflow behavior in a sandbox; it does not prove safety.
-
-## Benchmark workflow
-
-Run the observational static scanner benchmark against the shared fixture corpus with:
+Static benchmark:
 
 ```bash
 pnpm bench:static
-```
-
-Run the gated variant, which exits nonzero if any fixture exceeds the default `p95 <= 2000ms` budget:
-
-```bash
 pnpm bench:static:ci
 ```
 
-Override iterations for local tuning:
-
-```bash
-CLAWGUARD_BENCH_ITERATIONS=250 pnpm bench:static
-```
-
-Override the gated budget in local enforcement runs:
-
-```bash
-CLAWGUARD_BENCH_STATIC_P95_BUDGET_MS=1500 pnpm bench:static:ci
-```
-
-Run the detonation preflight benchmark, which verifies fixture loading, runtime detection, and deterministic request construction without claiming full sandbox execution coverage:
+Detonation benchmark:
 
 ```bash
 pnpm bench:detonation:preflight
-```
-
-Run the full detonation benchmark, which exercises the existing prompt runner and report-synthesis path for every detonation fixture when Podman or Docker is available, and otherwise reports a safe `runtime-unavailable` summary:
-
-```bash
 pnpm bench:detonation
-```
-
-Run the gated variant, which exits nonzero when an available runtime records fixture execution failures or exceeds the configured per-fixture budget:
-
-```bash
 pnpm bench:detonation:ci
 ```
 
-Override the gated budget for local enforcement runs:
+## Security Notes
 
-```bash
-CLAWGUARD_BENCH_DETONATION_BUDGET_MS=60000 pnpm bench:detonation:ci
-```
+- Podman is the default detonation runtime. Docker is the compatibility path.
+- VirusTotal and ClawHub are enrichment signals, not proof of safety.
+- Behavioral detonation reduces risk by exercising setup and workflow behavior in a sandbox. It does not prove a skill is safe.
+- ClawGuard is a local skill auditor, not a runtime authorization product.
 
-The repository now includes the foundation, discovery pipeline, first static scanner, threat-intelligence client foundations, and a reusable fixture corpus with gated static and detonation benchmark harnesses. Current progress and remaining work are tracked in [docs/clawguard-development-plan.md](docs/clawguard-development-plan.md) and [docs/clawguard-ticket-breakdown.md](docs/clawguard-ticket-breakdown.md). The architecture decisions behind the current foundation live in [docs/adr/README.md](docs/adr/README.md).
+## Documentation
+
+- [High-level development plan](docs/clawguard-development-plan.md)
+- [Ticket breakdown](docs/clawguard-ticket-breakdown.md)
+- [Architecture decision records](docs/adr/README.md)
+- [IPC overview](docs/ipc-overview.md)
+
+## License
+
+MIT
