@@ -61,6 +61,7 @@ pnpm release:check
 ```
 
 This runs lint, format checks, typechecks, workspace tests, the repo-built smoke pass, then builds the publishable root artifact, packs it into `.release/`, installs that tarball into a clean temp prefix, boots the installed daemon through `clawguard daemon`, and queries it through the installed CLI.
+The smoke pass also creates a local skill under a discovered root and exercises `clawguard detonate <slug>`, accepting either a completed behavioral run or a clear `runtime_unavailable` result when Podman/Docker is absent.
 
 Create the publishable artifact directly with:
 
@@ -76,6 +77,9 @@ After install, use the packaged CLI directly:
 ```bash
 clawguard daemon
 clawguard status
+clawguard scan /path/to/skill --detailed
+clawguard report <slug> --detailed
+clawguard detonate <slug> --detailed
 clawguard service install
 clawguard service status
 clawguard service uninstall
@@ -86,10 +90,15 @@ During repo development, the same commands remain available through the built ap
 ```bash
 node apps/cli/dist/index.js daemon
 node apps/cli/dist/index.js status
+node apps/cli/dist/index.js scan /path/to/skill --detailed
+node apps/cli/dist/index.js report <slug> --detailed
+node apps/cli/dist/index.js detonate <slug> --detailed
 node apps/cli/dist/index.js service install
 node apps/cli/dist/index.js service status
 node apps/cli/dist/index.js service uninstall
 ```
+
+`report <slug>` is the unified operator view. It always shows the latest static report and, when available, the latest detonation status and behavioral report for the same slug. Suspicious static scans automatically enqueue detonation after the static decision/quarantine path finishes. `detonate <slug>` also works as a manual operator command for locally installed skills under discovered roots.
 
 The `service` commands target the macOS `launchd` user service flow added in `CG-019`.
 

@@ -16,6 +16,7 @@
     "@clawguard/contracts": "workspace:*",
     "@clawguard/discovery": "workspace:*",
     "@clawguard/detonation": "workspace:*",
+    "@clawguard/integrations": "workspace:*",
     "@clawguard/platform": "workspace:*",
     "@clawguard/reports": "workspace:*",
     "@clawguard/scanner": "workspace:*",

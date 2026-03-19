@@ -64,6 +64,20 @@ export {
   type RunPromptRunnerOptions,
 } from "./prompt-runner.js";
 export {
+  buildLiveDetonationRequest,
+  collectDetonationArtifactPayloads,
+  defaultLiveDetonationPrompts,
+  evaluateDetonationReport,
+  runDetonationAnalysis,
+  type BuildLiveDetonationRequestOptions,
+  type DetonationArtifactPayload,
+  type DetonationFailureCode,
+  type RunDetonationAnalysisFailure,
+  type RunDetonationAnalysisOptions,
+  type RunDetonationAnalysisResult,
+  type RunDetonationAnalysisSuccess,
+} from "./execution.js";
+export {
   buildDetonationReportFromPromptRunner,
   type BuildDetonationReportOptions,
   type BuildDetonationReportResult,

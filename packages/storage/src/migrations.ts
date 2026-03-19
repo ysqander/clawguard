@@ -77,6 +77,31 @@ export const storageMigrations: StorageMigration[] = [
       "CREATE INDEX IF NOT EXISTS quarantine_entries_content_hash_idx ON quarantine_entries (content_hash)",
     ],
   },
+  {
+    version: 2,
+    statements: [
+      `
+        CREATE TABLE IF NOT EXISTS detonation_runs (
+          request_id TEXT PRIMARY KEY,
+          scan_id TEXT NOT NULL REFERENCES scans(scan_id) ON DELETE CASCADE,
+          skill_slug TEXT NOT NULL,
+          content_hash TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (
+            status IN ('queued', 'running', 'completed', 'failed', 'runtime-unavailable', 'disabled')
+          ),
+          runtime TEXT,
+          error_message TEXT,
+          started_at TEXT NOT NULL,
+          completed_at TEXT,
+          report_json TEXT
+        )
+      `,
+      "CREATE INDEX IF NOT EXISTS detonation_runs_scan_id_idx ON detonation_runs (scan_id)",
+      "CREATE INDEX IF NOT EXISTS detonation_runs_skill_slug_idx ON detonation_runs (skill_slug)",
+      "CREATE INDEX IF NOT EXISTS detonation_runs_content_hash_idx ON detonation_runs (content_hash)",
+      "CREATE INDEX IF NOT EXISTS detonation_runs_started_at_idx ON detonation_runs (started_at DESC)",
+    ],
+  },
 ];
 
 export const STORAGE_SCHEMA_VERSION = storageMigrations.at(-1)?.version ?? 0;

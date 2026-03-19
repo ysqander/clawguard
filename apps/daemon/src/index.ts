@@ -6,10 +6,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  defaultClawGuardConfig,
   daemonRequestEnvelopeValidator,
   resolveDaemonSocketPath,
+  type DetonationConfig,
+  type DetonationReport,
+  type DetonationStatusRecord,
   type OpenClawWorkspaceModel,
   type ScanRecord,
+  type ScanThresholdsConfig,
+  type SkillSnapshot,
   type StaticScanReport,
   type DaemonErrorResponse,
   type DaemonRequestEnvelope,
@@ -24,10 +30,27 @@ import {
   type SkillWatcherPipelineErrorContext,
   type SkillWatcherPipelineWatchContext,
 } from "@clawguard/discovery";
+import {
+  runDetonationAnalysis,
+  type RunDetonationAnalysisOptions,
+  type RunDetonationAnalysisResult,
+} from "@clawguard/detonation";
+import { VirusTotalHttpClient } from "@clawguard/integrations";
 import { createPlatformAdapter, type PlatformAdapter } from "@clawguard/platform";
-import { persistSynthesizedStaticReport, synthesizeStaticReport } from "@clawguard/reports";
+import {
+  persistSynthesizedStaticReport,
+  renderDetonationReport,
+  synthesizeStaticReport,
+  synthesizeUnifiedReport,
+} from "@clawguard/reports";
 import { scanSkillSnapshot } from "@clawguard/scanner";
-import { createStorage, type StoragePaths, type StoredStaticReport } from "@clawguard/storage";
+import {
+  createStorage,
+  type StoragePaths,
+  type StoredArtifactRecord,
+  type StoredDetonationRun,
+  type StoredStaticReport,
+} from "@clawguard/storage";
 
 import { buildScanNotification, type ScanRecommendation } from "./notifications.js";
 
@@ -39,12 +62,33 @@ const MAX_WARNING_ISSUES = 10;
 interface ScanJobResult {
   scan: ScanRecord;
   report?: StaticScanReport;
+  storedReport?: StoredStaticReport;
 }
 
 interface QueuedScanJob {
   idempotencyKey: string;
   skillPath: string;
+  scheduleAutoDetonation: boolean;
   resolve: (value: ScanJobResult) => void;
+  reject: (error: Error) => void;
+}
+
+interface EnsuredStaticScanResult {
+  scan: ScanRecord;
+  storedReport: StoredStaticReport;
+  snapshot: SkillSnapshot;
+}
+
+interface DetonationJobResult {
+  status: DetonationStatusRecord;
+  report?: DetonationReport;
+}
+
+interface QueuedDetonationJob {
+  idempotencyKey: string;
+  requestId: string;
+  ensuredScan: EnsuredStaticScanResult;
+  resolve: (value: DetonationJobResult) => void;
   reject: (error: Error) => void;
 }
 
@@ -56,6 +100,12 @@ export interface StartDaemonOptions {
   workspaceModel?: OpenClawWorkspaceModel;
   watcherDebounceMs?: number;
   watcherRetryDelayMs?: number;
+  detonationConfig?: Partial<DetonationConfig>;
+  scanThresholds?: Partial<ScanThresholdsConfig>;
+  detonationRunner?: (
+    snapshot: SkillSnapshot,
+    options?: RunDetonationAnalysisOptions,
+  ) => Promise<RunDetonationAnalysisResult>;
 }
 
 export class DaemonServer {
@@ -65,17 +115,27 @@ export class DaemonServer {
   private readonly lifecycle: SkillLifecycleManager;
   private readonly scanQueue: QueuedScanJob[] = [];
   private readonly inflightScanByKey = new Map<string, Promise<ScanJobResult>>();
+  private readonly detonationQueue: QueuedDetonationJob[] = [];
+  private readonly inflightDetonationByKey = new Map<string, Promise<DetonationJobResult>>();
   private readonly startWatcher: boolean;
   private readonly platform: PlatformAdapter | undefined;
   private readonly workspaceModel: OpenClawWorkspaceModel | undefined;
   private readonly watcherDebounceMs: number | undefined;
   private readonly watcherRetryDelayMs: number | undefined;
+  private readonly detonationConfig: DetonationConfig;
+  private readonly scanThresholds: ScanThresholdsConfig;
+  private readonly detonationRunner: (
+    snapshot: SkillSnapshot,
+    options?: RunDetonationAnalysisOptions,
+  ) => Promise<RunDetonationAnalysisResult>;
+  private readonly virusTotalClient: VirusTotalHttpClient | undefined;
   private readonly watcherIssuesByRoot = new Map<string, string>();
   private readonly watcherUnavailableRootsByPath = new Map<string, string>();
   private readonly warningIssues: string[] = [];
   private watcherStartupIssue: string | undefined;
   private watcherPipeline: SkillWatcherPipeline | undefined;
   private queueRunning = false;
+  private detonationQueueRunning = false;
 
   public constructor(options: StartDaemonOptions = {}) {
     this.socketPath = options.socketPath ?? resolveDaemonSocketPath();
@@ -88,6 +148,16 @@ export class DaemonServer {
     this.workspaceModel = options.workspaceModel;
     this.watcherDebounceMs = options.watcherDebounceMs;
     this.watcherRetryDelayMs = options.watcherRetryDelayMs;
+    this.detonationConfig = {
+      ...defaultClawGuardConfig.detonation,
+      ...options.detonationConfig,
+    };
+    this.scanThresholds = {
+      ...defaultClawGuardConfig.scanThresholds,
+      ...options.scanThresholds,
+    };
+    this.detonationRunner = options.detonationRunner ?? runDetonationAnalysis;
+    this.virusTotalClient = createVirusTotalClientFromEnv();
     this.server = net.createServer((socket) => {
       let buffer = "";
       socket.setEncoding("utf8");
@@ -153,7 +223,7 @@ export class DaemonServer {
         workspaceModel,
         watcher: this.platform.watcher,
         onScanScheduled: async (scan) => {
-          void this.enqueueScan(scan.idempotencyKey, scan.skillPath);
+          void this.enqueueScan(scan.idempotencyKey, scan.skillPath, true);
         },
         onRootRescanRequested: async () => {
           // Root rescans are advisory; watcher event granularity already provides skill-level scans.
@@ -206,6 +276,7 @@ export class DaemonServer {
           const result = await this.enqueueScan(
             request.payload.skillPath,
             request.payload.skillPath,
+            true,
           );
           return this.successResponse(request.requestId, {
             scan: result.scan,
@@ -223,7 +294,12 @@ export class DaemonServer {
             );
           }
 
-          return this.successResponse(request.requestId, this.toReportResponse(report));
+          const detonationRun = await this.getCurrentDetonationRunForReport(report);
+
+          return this.successResponse(
+            request.requestId,
+            this.toReportResponse(report, detonationRun),
+          );
         }
         case "allow":
         case "block": {
@@ -257,17 +333,17 @@ export class DaemonServer {
             throw new Error(`No static report found for slug ${request.payload.slug} after update`);
           }
 
-          return this.successResponse(request.requestId, this.toReportResponse(refreshedReport));
+          const detonationRun = await this.getCurrentDetonationRunForReport(refreshedReport);
+
+          return this.successResponse(
+            request.requestId,
+            this.toReportResponse(refreshedReport, detonationRun),
+          );
         }
         case "audit":
           return this.successResponse(request.requestId, { scans: await this.storage.listScans() });
         case "detonate":
-          return this.errorResponse(
-            request.requestId,
-            "not_implemented",
-            "Detonation orchestration lands in Milestone B tickets.",
-            false,
-          );
+          return await this.handleDetonateRequest(request.requestId, request.payload.slug);
       }
     } catch (error) {
       return this.errorResponse(
@@ -279,7 +355,52 @@ export class DaemonServer {
     }
   }
 
-  private enqueueScan(idempotencyKey: string, skillPath: string): Promise<ScanJobResult> {
+  private async handleDetonateRequest(
+    requestId: string,
+    slug: string,
+  ): Promise<DaemonResponseEnvelope> {
+    const ensuredScan = await this.ensureStaticScanForDetonation(slug);
+    if (!ensuredScan) {
+      return this.errorResponse(
+        requestId,
+        "not_found",
+        `No locally installed skill named ${slug} was found in the discovered skill roots.`,
+        false,
+      );
+    }
+
+    const disabledStatus = await this.prepareDetonationDisabledStatus(ensuredScan);
+    if (disabledStatus) {
+      return this.errorResponse(
+        requestId,
+        mapDetonationStatusToErrorCode(disabledStatus),
+        disabledStatus.errorMessage ?? "Detonation is disabled.",
+        false,
+      );
+    }
+
+    const detonationKey = this.buildDetonationIdempotencyKey(ensuredScan);
+    const result = await this.enqueueDetonation(detonationKey, ensuredScan);
+
+    if (result.report) {
+      return this.successResponse(requestId, {
+        report: result.report,
+      });
+    }
+
+    return this.errorResponse(
+      requestId,
+      mapDetonationStatusToErrorCode(result.status),
+      result.status.errorMessage ?? "Detonation did not produce a behavioral report.",
+      false,
+    );
+  }
+
+  private enqueueScan(
+    idempotencyKey: string,
+    skillPath: string,
+    scheduleAutoDetonation: boolean,
+  ): Promise<ScanJobResult> {
     const inflight = this.inflightScanByKey.get(idempotencyKey);
     if (inflight) {
       return inflight;
@@ -293,6 +414,7 @@ export class DaemonServer {
       this.scanQueue.push({
         idempotencyKey,
         skillPath,
+        scheduleAutoDetonation,
         resolve,
         reject,
       });
@@ -319,7 +441,7 @@ export class DaemonServer {
       }
 
       try {
-        const result = await this.runScanWithRetry(job.skillPath);
+        const result = await this.runScanWithRetry(job.skillPath, job.scheduleAutoDetonation);
         job.resolve(result);
       } catch (error) {
         job.reject(error instanceof Error ? error : new Error(String(error)));
@@ -328,12 +450,15 @@ export class DaemonServer {
     this.queueRunning = false;
   }
 
-  private async runScanWithRetry(skillPath: string): Promise<ScanJobResult> {
+  private async runScanWithRetry(
+    skillPath: string,
+    scheduleAutoDetonation: boolean,
+  ): Promise<ScanJobResult> {
     let lastError: Error | undefined;
 
     for (let attempt = 0; attempt <= SCAN_RETRY_LIMIT; attempt += 1) {
       try {
-        return await this.runScan(skillPath);
+        return await this.runScan(skillPath, scheduleAutoDetonation);
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         if (attempt < SCAN_RETRY_LIMIT) {
@@ -345,7 +470,10 @@ export class DaemonServer {
     throw lastError ?? new Error("Scan failed");
   }
 
-  private async runScan(skillPath: string): Promise<ScanJobResult> {
+  private async runScan(
+    skillPath: string,
+    scheduleAutoDetonation: boolean,
+  ): Promise<ScanJobResult> {
     const slug = path.basename(skillPath);
     const snapshotResult = await buildSkillSnapshot({
       skillPath,
@@ -380,7 +508,7 @@ export class DaemonServer {
     });
     const persisted = await persistSynthesizedStaticReport(this.storage, synthesis);
 
-    await this.lifecycle.applyPostScanDisposition({
+    const disposition = await this.lifecycle.applyPostScanDisposition({
       scanId: scan.scanId,
       skillSlug: scanReport.snapshot.slug,
       skillPath,
@@ -389,23 +517,424 @@ export class DaemonServer {
     });
     await this.sendScanNotification(persisted.storedReport.report);
 
+    if (scheduleAutoDetonation) {
+      const detonationSkillPath = resolveDetonationSkillPath(skillPath, disposition);
+      if (detonationSkillPath) {
+        void this.scheduleAutomaticDetonation({
+          scan,
+          storedReport: persisted.storedReport,
+          snapshot: {
+            ...scanReport.snapshot,
+            path: detonationSkillPath,
+          },
+        }).catch((error) => {
+          this.recordWarningIssue(
+            `Automatic detonation scheduling failed for ${scanReport.snapshot.slug}: ${
+              error instanceof Error ? error.message : "unknown error"
+            }`,
+          );
+        });
+      }
+    }
+
     return {
       scan,
       report: persisted.storedReport.report,
+      storedReport: persisted.storedReport,
     };
   }
 
-  private toReportResponse(report: StoredStaticReport): DaemonSuccessResponse["data"] {
+  private async ensureStaticScanForDetonation(
+    slug: string,
+  ): Promise<EnsuredStaticScanResult | undefined> {
+    const localSkill = await this.resolveLocalSkillSnapshot(slug);
+    if (!localSkill) {
+      return undefined;
+    }
+
+    const latestReport = await this.storage.getLatestStaticReportBySlug(slug);
+    if (
+      latestReport &&
+      latestReport.report.snapshot.contentHash === localSkill.snapshot.contentHash
+    ) {
+      const storedScan = await this.storage.getScan(latestReport.summary.scanId);
+      if (storedScan) {
+        return {
+          scan: storedScan,
+          storedReport: latestReport,
+          snapshot: localSkill.snapshot,
+        };
+      }
+    }
+
+    const scanResult = await this.enqueueScan(
+      localSkill.snapshot.path,
+      localSkill.snapshot.path,
+      false,
+    );
+    if (!scanResult.storedReport) {
+      throw new Error(`Static scan for ${slug} completed without a stored report.`);
+    }
+
     return {
-      summary: report.summary,
-      report: report.report,
-      ...(report.decision ? { decision: report.decision } : {}),
-      artifacts: report.artifacts,
+      scan: scanResult.scan,
+      storedReport: scanResult.storedReport,
+      snapshot: {
+        ...scanResult.storedReport.report.snapshot,
+        path: localSkill.snapshot.path,
+      },
     };
+  }
+
+  private async resolveLocalSkillSnapshot(
+    slug: string,
+  ): Promise<{ snapshot: SkillSnapshot } | undefined> {
+    const workspaceModel = this.workspaceModel ?? (await discoverOpenClawWorkspaceModel());
+
+    for (const skillRoot of workspaceModel.skillRoots) {
+      const snapshotResult = await buildSkillSnapshot({
+        skillPath: path.join(skillRoot.path, slug),
+        skillSlug: slug,
+        skillRootPath: skillRoot.path,
+        skillRootKind: skillRoot.kind,
+        discoverySource: skillRoot.source,
+        ...(skillRoot.workspaceId ? { workspaceId: skillRoot.workspaceId } : {}),
+      });
+
+      if (snapshotResult.ok) {
+        return {
+          snapshot: snapshotResult.snapshot,
+        };
+      }
+    }
+
+    return undefined;
+  }
+
+  private async prepareDetonationDisabledStatus(
+    ensuredScan: EnsuredStaticScanResult,
+  ): Promise<DetonationStatusRecord | undefined> {
+    if (!this.detonationConfig.enabled) {
+      const status = await this.storage.persistDetonationRun({
+        status: {
+          requestId: randomUUID(),
+          scanId: ensuredScan.scan.scanId,
+          slug: ensuredScan.storedReport.report.snapshot.slug,
+          contentHash: ensuredScan.storedReport.report.snapshot.contentHash,
+          status: "disabled",
+          errorMessage: "Detonation is disabled in the current daemon configuration.",
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+        },
+      });
+
+      return status.status;
+    }
+
+    return undefined;
+  }
+
+  private async scheduleAutomaticDetonation(ensuredScan: EnsuredStaticScanResult): Promise<void> {
+    if (!this.detonationConfig.enabled) {
+      return;
+    }
+
+    if (ensuredScan.storedReport.report.score < this.scanThresholds.detonationScore) {
+      return;
+    }
+
+    const detonationKey = this.buildDetonationIdempotencyKey(ensuredScan);
+    if (await this.shouldSkipAutomaticDetonation(ensuredScan, detonationKey)) {
+      return;
+    }
+
+    await this.enqueueDetonation(detonationKey, ensuredScan);
+  }
+
+  private async shouldSkipAutomaticDetonation(
+    ensuredScan: EnsuredStaticScanResult,
+    detonationKey: string,
+  ): Promise<boolean> {
+    if (this.inflightDetonationByKey.has(detonationKey)) {
+      return true;
+    }
+
+    const existing = await this.storage.getLatestDetonationRunByContentHash(
+      ensuredScan.storedReport.report.snapshot.contentHash,
+    );
+    if (!existing) {
+      return false;
+    }
+
+    return (
+      existing.status.slug === ensuredScan.storedReport.report.snapshot.slug &&
+      (existing.status.status === "queued" ||
+        existing.status.status === "running" ||
+        existing.status.status === "completed")
+    );
+  }
+
+  private async enqueueDetonation(
+    idempotencyKey: string,
+    ensuredScan: EnsuredStaticScanResult,
+  ): Promise<DetonationJobResult> {
+    const inflight = this.inflightDetonationByKey.get(idempotencyKey);
+    if (inflight) {
+      return inflight;
+    }
+
+    const existing = await this.storage.getLatestDetonationRunByContentHash(
+      ensuredScan.storedReport.report.snapshot.contentHash,
+    );
+    if (
+      existing?.status.slug === ensuredScan.storedReport.report.snapshot.slug &&
+      existing.status.status === "completed" &&
+      existing.report
+    ) {
+      return {
+        status: existing.status,
+        report: existing.report,
+      };
+    }
+
+    if (this.detonationQueue.length >= MAX_QUEUE_DEPTH) {
+      throw new Error(`Detonation queue is full (${MAX_QUEUE_DEPTH}).`);
+    }
+
+    const requestId = randomUUID();
+    const queuedStatus = await this.storage.persistDetonationRun({
+      status: {
+        requestId,
+        scanId: ensuredScan.scan.scanId,
+        slug: ensuredScan.storedReport.report.snapshot.slug,
+        contentHash: ensuredScan.storedReport.report.snapshot.contentHash,
+        status: "queued",
+        startedAt: new Date().toISOString(),
+      },
+    });
+
+    const promise = new Promise<DetonationJobResult>((resolve, reject) => {
+      this.detonationQueue.push({
+        idempotencyKey,
+        requestId: queuedStatus.status.requestId,
+        ensuredScan,
+        resolve,
+        reject,
+      });
+
+      void this.pumpDetonationQueue();
+    }).finally(() => {
+      this.inflightDetonationByKey.delete(idempotencyKey);
+    });
+
+    this.inflightDetonationByKey.set(idempotencyKey, promise);
+    return promise;
+  }
+
+  private async pumpDetonationQueue(): Promise<void> {
+    if (this.detonationQueueRunning) {
+      return;
+    }
+
+    this.detonationQueueRunning = true;
+    while (this.detonationQueue.length > 0) {
+      const job = this.detonationQueue.shift();
+      if (!job) {
+        continue;
+      }
+
+      try {
+        const result = await this.runDetonation(job.requestId, job.ensuredScan);
+        job.resolve(result);
+      } catch (error) {
+        const failure = error instanceof Error ? error : new Error(String(error));
+        await this.persistUnexpectedDetonationFailure(job.requestId, job.ensuredScan, failure);
+        job.reject(failure);
+      }
+    }
+    this.detonationQueueRunning = false;
+  }
+
+  private async runDetonation(
+    requestId: string,
+    ensuredScan: EnsuredStaticScanResult,
+  ): Promise<DetonationJobResult> {
+    const runningStatus: DetonationStatusRecord = {
+      requestId,
+      scanId: ensuredScan.scan.scanId,
+      slug: ensuredScan.storedReport.report.snapshot.slug,
+      contentHash: ensuredScan.storedReport.report.snapshot.contentHash,
+      status: "running",
+      startedAt: new Date().toISOString(),
+    };
+    await this.storage.persistDetonationRun({
+      status: runningStatus,
+    });
+
+    const result = await this.detonationRunner(ensuredScan.snapshot, {
+      requestId,
+      preferredRuntime: this.detonationConfig.defaultRuntime,
+      timeoutSeconds: this.detonationConfig.timeoutSeconds,
+      promptBudget: this.detonationConfig.promptBudget,
+      virustotalClient: this.virusTotalClient,
+    });
+
+    if (!result.ok) {
+      await this.persistDetonationRawArtifacts(ensuredScan.scan.scanId, result.artifactPayloads);
+      const stored = await this.storage.persistDetonationRun({
+        status: {
+          requestId,
+          scanId: ensuredScan.scan.scanId,
+          slug: ensuredScan.storedReport.report.snapshot.slug,
+          contentHash: ensuredScan.storedReport.report.snapshot.contentHash,
+          status: result.status,
+          ...(result.runtime ? { runtime: result.runtime } : {}),
+          errorMessage: result.message,
+          startedAt: result.startedAt,
+          completedAt: result.completedAt,
+        },
+      });
+
+      return {
+        status: stored.status,
+      };
+    }
+
+    const persisted = await this.persistDetonationArtifacts(
+      ensuredScan.scan.scanId,
+      result.report,
+      result.artifactPayloads,
+    );
+    const stored = await this.storage.persistDetonationRun({
+      status: {
+        requestId,
+        scanId: ensuredScan.scan.scanId,
+        slug: ensuredScan.storedReport.report.snapshot.slug,
+        contentHash: ensuredScan.storedReport.report.snapshot.contentHash,
+        status: "completed",
+        runtime: result.runtime,
+        startedAt: result.startedAt,
+        completedAt: result.completedAt,
+      },
+      report: persisted.report,
+    });
+
+    return {
+      status: stored.status,
+      report: persisted.report,
+    };
+  }
+
+  private async persistDetonationRawArtifacts(
+    scanId: string,
+    artifactPayloads: RunDetonationAnalysisResult["artifactPayloads"],
+  ): Promise<StoredArtifactRecord[]> {
+    const storedArtifacts: StoredArtifactRecord[] = [];
+
+    for (const artifact of artifactPayloads) {
+      storedArtifacts.push(
+        await this.storage.writeArtifact({
+          scanId,
+          type: artifact.type,
+          filename: artifact.filename,
+          data: artifact.data,
+          mimeType: artifact.mimeType,
+        }),
+      );
+    }
+
+    return storedArtifacts;
+  }
+
+  private async persistDetonationArtifacts(
+    scanId: string,
+    report: DetonationReport,
+    artifactPayloads: RunDetonationAnalysisResult["artifactPayloads"],
+  ): Promise<{ report: DetonationReport; artifacts: StoredArtifactRecord[] }> {
+    const rawArtifacts = await this.persistDetonationRawArtifacts(scanId, artifactPayloads);
+    const rawArtifactRefs = rawArtifacts.map(toArtifactRef);
+    const renderedReport = {
+      ...report,
+      artifacts: rawArtifactRefs,
+    };
+    const reportJson = await this.storage.writeJsonArtifact({
+      scanId,
+      type: "detonation-report-json",
+      filename: `${report.request.requestId}.detonation-report.json`,
+      value: renderedReport,
+    });
+    const reportMarkdown = await this.storage.writeArtifact({
+      scanId,
+      type: "detonation-report-markdown",
+      filename: `${report.request.requestId}.detonation-report.md`,
+      data: renderDetonationReport(renderedReport),
+      mimeType: "text/markdown",
+    });
+    const artifacts = [...rawArtifacts, reportJson, reportMarkdown];
+
+    return {
+      report: {
+        ...report,
+        artifacts: artifacts.map(toArtifactRef),
+      },
+      artifacts,
+    };
+  }
+
+  private buildDetonationIdempotencyKey(ensuredScan: EnsuredStaticScanResult): string {
+    return `${ensuredScan.storedReport.report.snapshot.slug}:${ensuredScan.storedReport.report.snapshot.contentHash}`;
+  }
+
+  private async getCurrentDetonationRunForReport(
+    report: StoredStaticReport,
+  ): Promise<StoredDetonationRun | undefined> {
+    return this.storage.getLatestDetonationRunByContentHash(report.report.snapshot.contentHash);
+  }
+
+  private toReportResponse(
+    report: StoredStaticReport,
+    detonationRun?: StoredDetonationRun,
+  ): DaemonSuccessResponse["data"] {
+    return synthesizeUnifiedReport({
+      staticReport: report,
+      ...(detonationRun ? { detonationRun } : {}),
+    });
+  }
+
+  private async persistUnexpectedDetonationFailure(
+    requestId: string,
+    ensuredScan: EnsuredStaticScanResult,
+    error: Error,
+  ): Promise<void> {
+    try {
+      const existing = await this.storage.getDetonationRun(requestId);
+      await this.storage.persistDetonationRun({
+        status: {
+          requestId,
+          scanId: ensuredScan.scan.scanId,
+          slug: ensuredScan.storedReport.report.snapshot.slug,
+          contentHash: ensuredScan.storedReport.report.snapshot.contentHash,
+          status: "failed",
+          errorMessage: error.message,
+          startedAt: existing?.status.startedAt ?? new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+        },
+      });
+    } catch (persistError) {
+      this.recordWarningIssue(
+        `Failed to persist unexpected detonation failure for ${ensuredScan.storedReport.report.snapshot.slug}: ${
+          persistError instanceof Error ? persistError.message : "unknown error"
+        }`,
+      );
+    }
   }
 
   private buildStatusResponse(): DaemonSuccessResponse["data"] {
-    const jobs = this.scanQueue.length + this.inflightScanByKey.size;
+    const jobs =
+      this.scanQueue.length +
+      this.inflightScanByKey.size +
+      this.detonationQueue.length +
+      this.inflightDetonationByKey.size;
     const watcher = this.getWatcherState();
     const degraded = watcher === "degraded";
     const issues = this.getActiveIssues();
@@ -585,6 +1114,69 @@ function toNotificationRecommendation(
     case "unknown":
       return "review";
   }
+}
+
+function createVirusTotalClientFromEnv(): VirusTotalHttpClient | undefined {
+  const apiKey = process.env.CLAWGUARD_VIRUSTOTAL_API_KEY ?? process.env.VIRUSTOTAL_API_KEY;
+  if (!apiKey) {
+    return undefined;
+  }
+
+  return new VirusTotalHttpClient({
+    apiKey,
+    baseUrl: defaultClawGuardConfig.threatIntel.virusTotal.baseUrl,
+  });
+}
+
+function resolveDetonationSkillPath(
+  originalSkillPath: string,
+  disposition: Awaited<ReturnType<SkillLifecycleManager["applyPostScanDisposition"]>>,
+): string | undefined {
+  switch (disposition.status) {
+    case "allowed":
+      return originalSkillPath;
+    case "quarantined":
+      return disposition.quarantine.quarantinePath;
+    case "blocked":
+      return undefined;
+  }
+}
+
+function mapDetonationStatusToErrorCode(status: DetonationStatusRecord): string {
+  switch (status.status) {
+    case "disabled":
+      return "detonation_disabled";
+    case "runtime-unavailable":
+      return "runtime_unavailable";
+    case "failed": {
+      const message = status.errorMessage?.toLowerCase() ?? "";
+      if (message.includes("timed out")) {
+        return "timeout";
+      }
+
+      if (
+        message.includes("unable to build sandbox image") ||
+        message.includes("unable to pull sandbox image")
+      ) {
+        return "sandbox_image_failure";
+      }
+
+      return "detonation_failed";
+    }
+    case "queued":
+    case "running":
+    case "completed":
+      return "detonation_incomplete";
+  }
+}
+
+function toArtifactRef(artifact: StoredArtifactRecord) {
+  return {
+    scanId: artifact.scanId,
+    type: artifact.type,
+    path: artifact.path,
+    mimeType: artifact.mimeType,
+  } as const;
 }
 
 function isMissingWatchRootError(error: Error): boolean {

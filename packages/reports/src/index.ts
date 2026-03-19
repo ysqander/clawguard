@@ -1,11 +1,18 @@
 import type {
+  DetonationReport,
+  DetonationStatusRecord,
   ReportSummary,
   ScanRecord,
   StaticScanReport,
   ThreatIntelVerdict,
   VerdictLevel,
 } from "@clawguard/contracts";
-import type { StorageApi, StoredArtifactRecord, StoredStaticReport } from "@clawguard/storage";
+import type {
+  StorageApi,
+  StoredArtifactRecord,
+  StoredDetonationRun,
+  StoredStaticReport,
+} from "@clawguard/storage";
 
 export interface StaticReportSynthesisInput {
   scan: ScanRecord;
@@ -33,6 +40,20 @@ export interface PersistSynthesizedStaticReportResult {
     reportJson: StoredArtifactRecord;
     summaryMarkdown: StoredArtifactRecord;
   };
+}
+
+export interface UnifiedReportSynthesisInput {
+  staticReport: StoredStaticReport;
+  detonationRun?: StoredDetonationRun;
+}
+
+export interface SynthesizedUnifiedReport {
+  summary: ReportSummary;
+  report: StaticScanReport;
+  decision?: NonNullable<StoredStaticReport["decision"]>;
+  artifacts: StoredArtifactRecord[];
+  detonationStatus?: DetonationStatusRecord;
+  detonationReport?: DetonationReport;
 }
 
 export function synthesizeStaticReport(input: StaticReportSynthesisInput): SynthesizedStaticReport {
@@ -115,6 +136,42 @@ export async function persistSynthesizedStaticReport(
   };
 }
 
+export function synthesizeUnifiedReport(
+  input: UnifiedReportSynthesisInput,
+): SynthesizedUnifiedReport {
+  const { staticReport } = input;
+  const detonationRun =
+    input.detonationRun?.status.contentHash === staticReport.report.snapshot.contentHash
+      ? input.detonationRun
+      : undefined;
+  const detonationReport =
+    detonationRun?.status.status === "completed" ? detonationRun.report : undefined;
+  const finalScore = Math.max(staticReport.summary.score, detonationReport?.score ?? 0);
+  const finalVerdict = maxVerdict(
+    staticReport.summary.verdict,
+    detonationReport?.recommendation ?? "unknown",
+  );
+  const artifacts = dedupeArtifacts([
+    ...staticReport.artifacts,
+    ...(detonationRun?.artifacts ?? []),
+  ]);
+
+  return {
+    summary: {
+      ...staticReport.summary,
+      verdict: finalVerdict,
+      score: finalScore,
+      findingCount: staticReport.report.findings.length + (detonationReport?.findings.length ?? 0),
+      generatedAt: detonationReport?.generatedAt ?? staticReport.summary.generatedAt,
+    },
+    report: staticReport.report,
+    ...(staticReport.decision ? { decision: staticReport.decision } : {}),
+    artifacts,
+    ...(detonationRun ? { detonationStatus: detonationRun.status } : {}),
+    ...(detonationReport ? { detonationReport } : {}),
+  };
+}
+
 export function renderStaticSummary(
   report: StaticScanReport,
   threatIntelVerdicts: ThreatIntelVerdict[] = [],
@@ -184,6 +241,71 @@ export function renderStaticReport(
       "Enrichment signals provide additional context and do not replace local static findings.",
     );
   }
+
+  return lines.join("\n");
+}
+
+export function renderDetonationSummary(report: DetonationReport): string {
+  const findingLabel =
+    report.findings.length === 1 ? "1 finding" : `${report.findings.length} findings`;
+  const enrichmentLabel =
+    report.intelligence && report.intelligence.length > 0
+      ? `${report.intelligence.length} enrichment signal${report.intelligence.length === 1 ? "" : "s"}`
+      : "no threat-intel enrichment";
+
+  return `${report.request.snapshot.slug}: ${report.recommendation} (score ${report.score}, ${findingLabel}, ${enrichmentLabel})`;
+}
+
+export function renderDetonationReport(report: DetonationReport): string {
+  const lines: string[] = [
+    `# ClawGuard detonation report: ${report.request.snapshot.slug}`,
+    "",
+    `Recommendation: **${uppercaseVerdict(report.recommendation)}**`,
+    `Score: ${report.score}`,
+    `Findings: ${report.findings.length}`,
+    "",
+    report.summary,
+    "",
+    "## Behavioral findings",
+  ];
+
+  if (report.findings.length === 0) {
+    lines.push("No behavioral findings were triggered.");
+  } else {
+    report.findings.forEach((finding, index) => {
+      lines.push(
+        `${index + 1}. [${finding.severity.toUpperCase()}] ${finding.message} (${finding.ruleId})`,
+      );
+      for (const evidence of finding.evidence) {
+        lines.push(`   - Evidence: ${evidence}`);
+      }
+    });
+  }
+
+  lines.push("", "## Triggered actions");
+
+  if (report.triggeredActions.length === 0) {
+    lines.push("No high-signal process actions were captured.");
+  } else {
+    lines.push(...report.triggeredActions.map((action) => `- ${action}`));
+  }
+
+  lines.push("", "## Threat-intelligence enrichment");
+
+  if (!report.intelligence || report.intelligence.length === 0) {
+    lines.push("No enrichment signals were available for this detonation run.");
+  } else {
+    for (const verdict of report.intelligence) {
+      lines.push(
+        `- ${verdict.provider} ${verdict.subjectType} ${verdict.subject}: ${verdict.verdict} — ${verdict.summary}`,
+      );
+    }
+  }
+
+  lines.push(
+    "",
+    "Detonation reduces risk by exercising setup and workflow behavior in a sandbox; it does not prove safety.",
+  );
 
   return lines.join("\n");
 }
@@ -276,6 +398,40 @@ function buildDecisionReason(
 
 function uppercaseVerdict(verdict: VerdictLevel): string {
   return verdict.toUpperCase();
+}
+
+function compareVerdictRisk(left: VerdictLevel, right: VerdictLevel): number {
+  return verdictRisk(left) - verdictRisk(right);
+}
+
+function maxVerdict(left: VerdictLevel, right: VerdictLevel): VerdictLevel {
+  return compareVerdictRisk(left, right) >= 0 ? left : right;
+}
+
+function verdictRisk(verdict: VerdictLevel): number {
+  switch (verdict) {
+    case "unknown":
+      return 0;
+    case "allow":
+      return 1;
+    case "review":
+      return 2;
+    case "block":
+      return 3;
+  }
+}
+
+function dedupeArtifacts(artifacts: StoredArtifactRecord[]): StoredArtifactRecord[] {
+  const byRelativePath = new Map<string, StoredArtifactRecord>();
+  for (const artifact of artifacts) {
+    byRelativePath.set(artifact.relativePath, artifact);
+  }
+
+  return [...byRelativePath.values()].sort((left, right) =>
+    left.createdAt === right.createdAt
+      ? left.relativePath.localeCompare(right.relativePath)
+      : left.createdAt.localeCompare(right.createdAt),
+  );
 }
 
 function readMetadataString(metadata: Record<string, unknown>, key: string): string | undefined {

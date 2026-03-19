@@ -47,6 +47,9 @@ importers:
       '@clawguard/discovery':
         specifier: workspace:*
         version: link:../../packages/discovery
+      '@clawguard/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@clawguard/platform':
         specifier: workspace:*
         version: link:../../packages/platform

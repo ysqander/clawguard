@@ -16,6 +16,7 @@ import {
   artifactRefValidator,
   decisionRecordValidator,
   detonationReportValidator,
+  detonationStatusRecordValidator,
   reportSummaryValidator,
   scanRecordValidator,
   staticScanReportValidator,
@@ -99,6 +100,8 @@ export interface ReportResponseData {
   report: ReturnType<typeof staticScanReportValidator.parse>;
   decision?: ReturnType<typeof decisionRecordValidator.parse>;
   artifacts: Array<ReturnType<typeof artifactRefValidator.parse>>;
+  detonationStatus?: ReturnType<typeof detonationStatusRecordValidator.parse>;
+  detonationReport?: ReturnType<typeof detonationReportValidator.parse>;
 }
 
 export interface DetonateResponseData {
@@ -228,12 +231,24 @@ function parseReportResponseData(input: unknown, path: string): ReportResponseDa
       decisionRecordValidator.parse,
       `${path}.decision`,
     );
+    const detonationStatus = parseOptional(
+      record.detonationStatus,
+      detonationStatusRecordValidator.parse,
+      `${path}.detonationStatus`,
+    );
+    const detonationReport = parseOptional(
+      record.detonationReport,
+      detonationReportValidator.parse,
+      `${path}.detonationReport`,
+    );
 
     return {
       summary: reportSummaryValidator.parse(record.summary),
       report: staticScanReportValidator.parse(record.report),
       ...(decision !== undefined ? { decision } : {}),
       artifacts: parseArray(record.artifacts, artifactRefValidator.parse, `${path}.artifacts`),
+      ...(detonationStatus !== undefined ? { detonationStatus } : {}),
+      ...(detonationReport !== undefined ? { detonationReport } : {}),
     };
   });
 }

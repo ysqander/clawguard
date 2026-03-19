@@ -371,8 +371,7 @@ Status: `Complete`
 
 Scope:
 
-- Implement `report`, `allow`, `block`, `scan`, `status`, and `audit` end-to-end against daemon-backed state.
-- Keep the `detonate` command on the CLI surface, but make its pre-Milestone-B behavior explicit and actionable.
+- Implement `report`, `allow`, `block`, `scan`, `detonate`, `status`, and `audit` end-to-end against daemon-backed state.
 - Format terminal output for both concise and detailed reports.
 - Handle daemon-unavailable and runtime-unavailable cases cleanly.
 
@@ -380,7 +379,7 @@ Acceptance criteria:
 
 - Static-path commands (`report`, `allow`, `block`, `scan`, `status`, and `audit`) work end-to-end against daemon-backed state.
 - Operators can review and resolve quarantine decisions from the CLI.
-- `detonate` returns a clear, actionable "not implemented yet" response until behavioral orchestration lands.
+- `detonate` resolves a local installed skill by slug, runs end-to-end behavioral detonation, and returns a structured behavioral report or actionable runtime failure.
 - Error messages are actionable and non-ambiguous.
 
 ### CG-019 Implement macOS notifications and launchd service setup

@@ -120,7 +120,9 @@ test("buildDetonationReportFromPromptRunner captures trace telemetry and persist
     assert.ok(built.artifacts.some((artifact) => artifact.type === "detonation-trace"));
     assert.ok(built.artifacts.some((artifact) => artifact.type === "memory-diff"));
 
-    const telemetryArtifact = built.artifacts.find((artifact) => artifact.type === "report-json");
+    const telemetryArtifact = built.artifacts.find(
+      (artifact) => artifact.type === "detonation-report-json",
+    );
     assert.ok(telemetryArtifact);
     const telemetryJson = await readFile(telemetryArtifact.path, "utf8");
     assert.match(telemetryJson, /93\.184\.216\.34/u);
@@ -293,6 +295,8 @@ test("buildDetonationReportFromPromptRunner deduplicates argv[0] in process even
     built.report.triggeredActions.some((a) => a === "/usr/bin/curl https://example.com/file"),
     "triggeredActions should also deduplicate argv[0]",
   );
+  assert.equal(built.report.score, 0);
+  assert.equal(built.report.recommendation, "allow");
 });
 
 test("buildDetonationReportFromPromptRunner suppresses execution-record process events for traced steps", async () => {

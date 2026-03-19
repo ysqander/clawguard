@@ -2,6 +2,8 @@ import type {
   ArtifactRef,
   ArtifactType,
   DecisionRecord,
+  DetonationReport,
+  DetonationStatusRecord,
   ReportSummary,
   ScanRecord,
   StaticScanReport,
@@ -29,6 +31,11 @@ export interface PersistScanInput {
 export interface PersistStaticReportInput {
   summary: ReportSummary;
   report: StaticScanReport;
+}
+
+export interface PersistDetonationRunInput {
+  status: DetonationStatusRecord;
+  report?: DetonationReport;
 }
 
 export interface WriteArtifactInput {
@@ -93,6 +100,12 @@ export interface StoredStaticReport {
   artifacts: StoredArtifactRecord[];
 }
 
+export interface StoredDetonationRun {
+  status: DetonationStatusRecord;
+  report?: DetonationReport;
+  artifacts: StoredArtifactRecord[];
+}
+
 export interface StorageApi {
   readonly paths: StoragePaths;
   readonly schemaVersion: number;
@@ -105,6 +118,12 @@ export interface StorageApi {
   getStaticReport(reportId: string): Promise<StoredStaticReport | undefined>;
   getLatestStaticReportBySlug(slug: string): Promise<StoredStaticReport | undefined>;
   getLatestStaticReportByContentHash(contentHash: string): Promise<StoredStaticReport | undefined>;
+  persistDetonationRun(input: PersistDetonationRunInput): Promise<StoredDetonationRun>;
+  getDetonationRun(requestId: string): Promise<StoredDetonationRun | undefined>;
+  getLatestDetonationRunBySlug(slug: string): Promise<StoredDetonationRun | undefined>;
+  getLatestDetonationRunByContentHash(
+    contentHash: string,
+  ): Promise<StoredDetonationRun | undefined>;
   writeArtifact(input: WriteArtifactInput): Promise<StoredArtifactRecord>;
   writeJsonArtifact(input: WriteJsonArtifactInput): Promise<StoredArtifactRecord>;
   upsertDecision(input: UpsertDecisionInput): Promise<DecisionRecord>;

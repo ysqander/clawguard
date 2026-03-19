@@ -18,6 +18,7 @@ export type {
   StorageApi,
   StoragePaths,
   StoredArtifactRecord,
+  StoredDetonationRun,
   StoredStaticReport,
   UpsertDecisionInput,
   WriteArtifactInput,

@@ -163,7 +163,9 @@ test("detonation integration persists artifacts and enriches normalized telemetr
     assert.ok(built.artifacts.some((artifact) => artifact.type === "memory-diff"));
     assert.ok(built.report.triggeredActions.length > 0);
 
-    const reportJsonArtifact = built.artifacts.find((artifact) => artifact.type === "report-json");
+    const reportJsonArtifact = built.artifacts.find(
+      (artifact) => artifact.type === "detonation-report-json",
+    );
     assert.ok(reportJsonArtifact);
     const reportJson = await readFile(reportJsonArtifact.path, "utf8");
     assert.match(reportJson, /payloads\.evil\.example/u);

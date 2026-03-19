@@ -12,6 +12,8 @@ import {
   daemonResponseEnvelopeValidator,
   resolveDaemonSocketPath,
   type ArtifactRef,
+  type DetonateResponseData,
+  type DetonationStatusRecord,
   type DaemonErrorResponse,
   type DaemonRequestEnvelope,
   type DaemonRequestPayload,
@@ -22,7 +24,12 @@ import {
   type ScanRecord,
 } from "@clawguard/contracts";
 import { createPlatformAdapter } from "@clawguard/platform";
-import { renderStaticReport, renderStaticSummary } from "@clawguard/reports";
+import {
+  renderDetonationReport,
+  renderDetonationSummary,
+  renderStaticReport,
+  renderStaticSummary,
+} from "@clawguard/reports";
 
 import {
   buildDaemonLaunchCommand,
@@ -152,9 +159,11 @@ export function buildPayload(command: string, args: string[]): DaemonRequestPayl
       };
     }
     case "detonate": {
-      throw new Error(
-        "Detonation is not available in this release. Use clawguard scan <skill-path> and clawguard report <slug> instead.",
-      );
+      const slug = args[0];
+      if (!slug) {
+        throw new Error("Usage: clawguard detonate <slug>");
+      }
+      return { command: "detonate", slug };
     }
     default:
       throw new Error(`Unknown command: ${command}`);
@@ -258,8 +267,23 @@ export function formatSuccess(
         ),
       ].join("\n");
     }
-    case "detonate":
-      return JSON.stringify(data, null, 2);
+    case "detonate": {
+      if (!isDetonateResponseData(data)) {
+        return JSON.stringify(data, null, 2);
+      }
+
+      const lines = [
+        `Detonation completed for ${data.report.request.snapshot.slug}`,
+        `Recommendation: ${data.report.recommendation}`,
+        `Summary: ${renderDetonationSummary(data.report)}`,
+      ];
+
+      if (detailed) {
+        lines.push("", renderDetonationReport(data.report));
+      }
+
+      return lines.join("\n");
+    }
   }
 }
 
@@ -277,9 +301,20 @@ function formatReportResponse(data: ReportResponseData, detailed: boolean): stri
 
   lines.push(`Summary: ${renderStaticSummary(data.report)}`);
 
+  if (data.detonationStatus) {
+    lines.push(formatDetonationStatus(data.detonationStatus));
+  }
+
+  if (data.detonationReport) {
+    lines.push(`Behavioral summary: ${renderDetonationSummary(data.detonationReport)}`);
+  }
+
   if (detailed) {
     lines.push("");
     lines.push(renderStaticReport(data.report));
+    if (data.detonationReport) {
+      lines.push("", renderDetonationReport(data.detonationReport));
+    }
     if (data.artifacts.length > 0) {
       lines.push("", "Artifacts:", ...data.artifacts.map(formatArtifact));
     }
@@ -307,7 +342,18 @@ export function formatConnectionError(error: unknown): string {
 }
 
 function formatDaemonError(_payload: DaemonRequestPayload, response: DaemonErrorResponse): string {
-  return `error (${response.error.code}): ${response.error.message}`;
+  switch (response.error.code) {
+    case "detonation_disabled":
+      return `error (${response.error.code}): ${response.error.message}\nEnable detonation in the daemon configuration and retry.`;
+    case "runtime_unavailable":
+      return `error (${response.error.code}): ${response.error.message}\nInstall Podman (preferred) or Docker and retry.`;
+    case "sandbox_image_failure":
+      return `error (${response.error.code}): ${response.error.message}\nVerify the container runtime can build or pull the sandbox image and retry.`;
+    case "timeout":
+      return `error (${response.error.code}): ${response.error.message}\nRetry the detonation or increase the runtime timeout before launch.`;
+    default:
+      return `error (${response.error.code}): ${response.error.message}`;
+  }
 }
 
 function formatScanMetadata(scan: ScanRecord): string {
@@ -322,6 +368,22 @@ function formatArtifact(artifact: ArtifactRef): string {
   return `- [${artifact.type}] ${artifact.path}`;
 }
 
+function isDetonateResponseData(data: DaemonResponseData): data is DetonateResponseData {
+  return "report" in data && !("summary" in data);
+}
+
+function formatDetonationStatus(status: DetonationStatusRecord): string {
+  const detail = [
+    `Behavioral detonation: ${status.status}`,
+    status.runtime ? `runtime=${status.runtime}` : undefined,
+    status.errorMessage,
+  ]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(" | ");
+
+  return detail;
+}
+
 function getHelpText(): string {
   return [
     "ClawGuard CLI",
@@ -332,6 +394,7 @@ function getHelpText(): string {
     "  clawguard daemon",
     "  clawguard scan <skill-path> [--detailed]",
     "  clawguard report <slug> [--detailed]",
+    "  clawguard detonate <slug> [--detailed]",
     "  clawguard allow <slug> [reason] [--detailed]",
     "  clawguard block <slug> [reason] [--detailed]",
     "  clawguard service install",

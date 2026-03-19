@@ -4,6 +4,8 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import {
+  detonationReportValidator,
+  detonationStatusRecordValidator,
   decisionRecordValidator,
   reportSummaryValidator,
   scanRecordValidator,
@@ -11,7 +13,10 @@ import {
 } from "@clawguard/contracts";
 import type {
   ArtifactRef,
+  ArtifactType,
   DecisionRecord,
+  DetonationReport,
+  DetonationStatusRecord,
   ReportSummary,
   ScanRecord,
   StaticScanReport,
@@ -24,6 +29,7 @@ import { resolveStoragePaths } from "./paths.js";
 import type {
   CreateQuarantineRecordInput,
   ListQuarantineRecordsOptions,
+  PersistDetonationRunInput,
   PersistScanInput,
   PersistStaticReportInput,
   QuarantineRecord,
@@ -31,6 +37,7 @@ import type {
   StorageApi,
   StoragePaths,
   StoredArtifactRecord,
+  StoredDetonationRun,
   StoredStaticReport,
   UpsertDecisionInput,
   WriteArtifactInput,
@@ -71,6 +78,19 @@ interface ArtifactRow {
   created_at: string;
 }
 
+interface DetonationRunRow {
+  request_id: string;
+  scan_id: string;
+  skill_slug: string;
+  content_hash: string;
+  status: DetonationStatusRecord["status"];
+  runtime: DetonationStatusRecord["runtime"] | null;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+  report_json: string | null;
+}
+
 interface DecisionRow {
   content_hash: string;
   decision: DecisionRecord["decision"];
@@ -89,6 +109,21 @@ interface QuarantineRow {
   created_at: string;
   updated_at: string;
 }
+
+const STATIC_ARTIFACT_TYPES = [
+  "report-json",
+  "report-markdown",
+] as const satisfies readonly ArtifactType[];
+const DETONATION_ARTIFACT_TYPES = [
+  "detonation-report-json",
+  "detonation-report-markdown",
+  "detonation-stdout",
+  "detonation-stderr",
+  "detonation-trace",
+  "network-capture",
+  "memory-diff",
+  "file-diff",
+] as const satisfies readonly ArtifactType[];
 
 function parseJson<T>(value: string): T {
   return JSON.parse(value) as T;
@@ -113,6 +148,24 @@ function readDecisionRecord(row: DecisionRow): DecisionRecord {
     reason: row.reason,
     createdAt: row.created_at,
   });
+}
+
+function readDetonationStatusRecord(row: DetonationRunRow): DetonationStatusRecord {
+  return detonationStatusRecordValidator.parse({
+    requestId: row.request_id,
+    scanId: row.scan_id,
+    slug: row.skill_slug,
+    contentHash: row.content_hash,
+    status: row.status,
+    ...(row.runtime ? { runtime: row.runtime } : {}),
+    ...(row.error_message ? { errorMessage: row.error_message } : {}),
+    startedAt: row.started_at,
+    ...(row.completed_at ? { completedAt: row.completed_at } : {}),
+  });
+}
+
+function readDetonationReport(row: DetonationRunRow): DetonationReport | undefined {
+  return row.report_json ? detonationReportValidator.parse(parseJson(row.report_json)) : undefined;
 }
 
 function readStoredArtifactRecord(row: ArtifactRow, artifactsRoot: string): StoredArtifactRecord {
@@ -155,6 +208,17 @@ function ensureReportConsistency(summary: ReportSummary, report: StaticScanRepor
       `Report summary/report mismatch: summary.slug=${summary.slug}, report.snapshot.slug=${report.snapshot.slug}`,
     );
   }
+}
+
+function toSqlPlaceholders(values: readonly unknown[]): string {
+  return values.map(() => "?").join(", ");
+}
+
+function sanitizeArtifactSegment(value: string): string {
+  return value
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "");
 }
 
 export class ClawGuardStorage implements StorageApi {
@@ -364,7 +428,7 @@ export class ClawGuardStorage implements StorageApi {
 
     const summary = readReportSummary(row);
     const report = readStaticScanReport(row);
-    const artifacts = this.getArtifactsByScanId(summary.scanId);
+    const artifacts = this.getArtifactsByScanId(summary.scanId, STATIC_ARTIFACT_TYPES);
     const decision = await this.getDecision(report.snapshot.contentHash);
 
     return {
@@ -395,6 +459,140 @@ export class ClawGuardStorage implements StorageApi {
       .get(contentHash) as { report_id: string } | undefined;
 
     return row ? this.getStaticReport(row.report_id) : undefined;
+  }
+
+  public async persistDetonationRun(
+    input: PersistDetonationRunInput,
+  ): Promise<StoredDetonationRun> {
+    const status = detonationStatusRecordValidator.parse(input.status);
+    const report = input.report ? detonationReportValidator.parse(input.report) : undefined;
+
+    if (report && report.request.requestId !== status.requestId) {
+      throw new Error(
+        `Detonation status/report mismatch: status.requestId=${status.requestId}, report.request.requestId=${report.request.requestId}`,
+      );
+    }
+
+    this.db
+      .prepare(
+        `
+          INSERT INTO detonation_runs (
+            request_id,
+            scan_id,
+            skill_slug,
+            content_hash,
+            status,
+            runtime,
+            error_message,
+            started_at,
+            completed_at,
+            report_json
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(request_id) DO UPDATE SET
+            scan_id = excluded.scan_id,
+            skill_slug = excluded.skill_slug,
+            content_hash = excluded.content_hash,
+            status = excluded.status,
+            runtime = excluded.runtime,
+            error_message = excluded.error_message,
+            started_at = excluded.started_at,
+            completed_at = excluded.completed_at,
+            report_json = excluded.report_json
+        `,
+      )
+      .run(
+        status.requestId,
+        status.scanId,
+        status.slug,
+        status.contentHash,
+        status.status,
+        status.runtime ?? null,
+        status.errorMessage ?? null,
+        status.startedAt,
+        status.completedAt ?? null,
+        report ? JSON.stringify(report) : null,
+      );
+
+    const storedRun = await this.getDetonationRun(status.requestId);
+    if (!storedRun) {
+      throw new Error(`Failed to read persisted detonation run ${status.requestId}`);
+    }
+
+    return storedRun;
+  }
+
+  public async getDetonationRun(requestId: string): Promise<StoredDetonationRun | undefined> {
+    const row = this.db
+      .prepare(
+        `
+          SELECT
+            request_id,
+            scan_id,
+            skill_slug,
+            content_hash,
+            status,
+            runtime,
+            error_message,
+            started_at,
+            completed_at,
+            report_json
+          FROM detonation_runs
+          WHERE request_id = ?
+        `,
+      )
+      .get(requestId) as DetonationRunRow | undefined;
+
+    if (!row) {
+      return undefined;
+    }
+
+    const report = readDetonationReport(row);
+    const requestIdToken = sanitizeArtifactSegment(row.request_id);
+
+    return {
+      status: readDetonationStatusRecord(row),
+      ...(report ? { report } : {}),
+      artifacts: this.getArtifactsByScanId(row.scan_id, DETONATION_ARTIFACT_TYPES).filter(
+        (artifact) => artifact.relativePath.includes(requestIdToken),
+      ),
+    };
+  }
+
+  public async getLatestDetonationRunBySlug(
+    slug: string,
+  ): Promise<StoredDetonationRun | undefined> {
+    const row = this.db
+      .prepare(
+        `
+          SELECT request_id
+          FROM detonation_runs
+          WHERE skill_slug = ?
+          ORDER BY started_at DESC, request_id DESC
+          LIMIT 1
+        `,
+      )
+      .get(slug) as { request_id: string } | undefined;
+
+    return row ? this.getDetonationRun(row.request_id) : undefined;
+  }
+
+  public async getLatestDetonationRunByContentHash(
+    contentHash: string,
+  ): Promise<StoredDetonationRun | undefined> {
+    const row = this.db
+      .prepare(
+        `
+          SELECT request_id
+          FROM detonation_runs
+          WHERE content_hash = ?
+          ORDER BY started_at DESC, request_id DESC
+          LIMIT 1
+        `,
+      )
+      .get(contentHash) as { request_id: string } | undefined;
+
+    return row ? this.getDetonationRun(row.request_id) : undefined;
   }
 
   public async writeArtifact(input: WriteArtifactInput): Promise<StoredArtifactRecord> {
@@ -632,7 +830,14 @@ export class ClawGuardStorage implements StorageApi {
     }
   }
 
-  private getArtifactsByScanId(scanId: string): StoredArtifactRecord[] {
+  private getArtifactsByScanId(
+    scanId: string,
+    artifactTypes?: readonly ArtifactType[],
+  ): StoredArtifactRecord[] {
+    const typeFilter =
+      artifactTypes && artifactTypes.length > 0
+        ? ` AND artifact_type IN (${toSqlPlaceholders(artifactTypes)})`
+        : "";
     const rows = this.db
       .prepare(
         `
@@ -646,11 +851,11 @@ export class ClawGuardStorage implements StorageApi {
             size_bytes,
             created_at
           FROM artifacts
-          WHERE scan_id = ?
+          WHERE scan_id = ?${typeFilter}
           ORDER BY created_at ASC, artifact_id ASC
         `,
       )
-      .all(scanId) as unknown as ArtifactRow[];
+      .all(scanId, ...(artifactTypes ?? [])) as unknown as ArtifactRow[];
 
     return rows.map((row) => readStoredArtifactRecord(row, this.paths.artifactsRoot));
   }

