@@ -35,6 +35,7 @@ export {
   RuntimeCommandTimeoutError,
 } from "./runtime-provider.js";
 export {
+  defaultDetonationHoneypotPaths,
   defaultDetonationSandboxLayout,
   prepareDetonationEnvironment,
   runSandboxCommand,

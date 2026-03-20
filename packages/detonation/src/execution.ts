@@ -11,8 +11,9 @@ import {
   type SkillSnapshot,
   type VerdictLevel,
 } from "@clawguard/contracts";
+import { analyzeSkillSnapshot } from "@clawguard/scanner";
 
-import { defaultDetonationSandboxLayout } from "./environment.js";
+import { defaultDetonationHoneypotPaths, defaultDetonationSandboxLayout } from "./environment.js";
 import {
   buildDetonationReportFromPromptRunner,
   enrichDetonationTelemetryIndicators,
@@ -200,11 +201,16 @@ export async function runDetonationAnalysis(
 }
 
 export function evaluateDetonationReport(report: DetonationReport): DetonationReport {
+  const staticAnalysis = analyzeSkillSnapshot(report.request.snapshot);
   const findings = compactFindings([
     buildStagedDownloadFinding(report.telemetry ?? []),
     buildFetchedScriptExecutionFinding(report.telemetry ?? []),
     buildHoneypotAccessFinding(report.telemetry ?? []),
+    buildSecretExfilChainFinding(report.telemetry ?? []),
+    buildCredentialHarvestingFinding(report.telemetry ?? []),
     buildMemoryMutationFinding(report.telemetry ?? []),
+    buildPersistentInstructionInjectionFinding(report.telemetry ?? []),
+    buildReverseShellFinding(report.telemetry ?? [], staticAnalysis),
     buildSuspiciousNetworkChainFinding(report.telemetry ?? []),
   ]);
   const score = computeRiskScore(findings);
@@ -394,6 +400,49 @@ function buildHoneypotAccessFinding(
   };
 }
 
+function buildSecretExfilChainFinding(
+  telemetry: DetonationTelemetryEvent[],
+): DetonationFinding | undefined {
+  const stepGroups = groupTelemetryByStep(telemetry);
+
+  for (const group of stepGroups.values()) {
+    const honeypotReads = group.filter(
+      (event) =>
+        event.type === "file" &&
+        event.file &&
+        event.file.operation === "read" &&
+        isHoneypotPath(event.file.path),
+    );
+    const suspiciousProcesses = group.filter(
+      (event) =>
+        event.type === "process" &&
+        event.process &&
+        processLooksLikeSecretExfiltration(event.process),
+    );
+    const networkEvents = group.filter((event) => event.type === "network" && event.network);
+
+    if (honeypotReads.length === 0 || (suspiciousProcesses.length === 0 && networkEvents.length === 0)) {
+      continue;
+    }
+
+    return {
+      ruleId: "CG-DET-SECRET-EXFIL-CHAIN",
+      severity: "critical",
+      message:
+        "Behavioral detonation observed honeypot secret access chained to an outbound exfiltration attempt.",
+      evidence: unique([
+        ...honeypotReads.map((event) => event.detail),
+        ...suspiciousProcesses.map((event) => event.detail),
+        ...networkEvents.map((event) => event.detail),
+      ]).slice(0, MAX_EVIDENCE),
+      signalIds: ["secret-source", "network-sink"],
+      confidence: 96,
+    };
+  }
+
+  return undefined;
+}
+
 function buildMemoryMutationFinding(
   telemetry: DetonationTelemetryEvent[],
 ): DetonationFinding | undefined {
@@ -404,10 +453,154 @@ function buildMemoryMutationFinding(
 
   return {
     ruleId: "CG-DET-MEMORY-MUTATION",
-    severity: "high",
+    severity: "critical",
     message: "Behavioral detonation observed mutation of persistent memory files.",
     evidence: unique(matches.map((event) => event.detail)).slice(0, MAX_EVIDENCE),
   };
+}
+
+function buildPersistentInstructionInjectionFinding(
+  telemetry: DetonationTelemetryEvent[],
+): DetonationFinding | undefined {
+  const matches = telemetry.filter(
+    (event) =>
+      event.type === "memory" &&
+      event.memory &&
+      /\b(?:always trust|skip confirmation|do not log|take priority|future sessions?|responding normally)\b/i.test(
+        event.detail,
+      ),
+  );
+  if (matches.length === 0) {
+    return undefined;
+  }
+
+  return {
+    ruleId: "CG-DET-PERSISTENT-INSTRUCTION-INJECTION",
+    severity: "critical",
+    message:
+      "Behavioral detonation observed persistent memory mutation that alters future instruction handling.",
+    evidence: unique(matches.map((event) => event.detail)).slice(0, MAX_EVIDENCE),
+    signalIds: ["memory-target", "persistence-directive", "prompt-override"],
+    confidence: 94,
+  };
+}
+
+function buildCredentialHarvestingFinding(
+  telemetry: DetonationTelemetryEvent[],
+): DetonationFinding | undefined {
+  const stepGroups = groupTelemetryByStep(telemetry);
+
+  for (const group of stepGroups.values()) {
+    const matches = group.filter(
+      (event) =>
+        event.type === "process" &&
+        event.process &&
+        processLooksLikeCredentialHarvesting(event.process),
+    );
+    if (matches.length === 0) {
+      continue;
+    }
+
+    const followUpWrites = group.filter(
+      (event) =>
+        event.type === "file" &&
+        event.file &&
+        event.file.operation !== "read" &&
+        /(?:session-auth|auth|password|credential)/i.test(event.file.path),
+    );
+    const persistenceWrites = group.filter(
+      (event) =>
+        event.type === "memory" ||
+        (event.type === "file" &&
+          event.file &&
+          event.file.operation !== "read" &&
+          /(?:MEMORY\.md|SOUL\.md|USER\.md)/i.test(event.file.path)),
+    );
+
+    if (followUpWrites.length === 0 && persistenceWrites.length === 0) {
+      continue;
+    }
+
+    return {
+      ruleId: "CG-DET-CREDENTIAL-HARVESTING",
+      severity: "critical",
+      message: "Behavioral detonation observed a credential-harvesting prompt workflow.",
+      evidence: unique([
+        ...matches.map((event) => event.detail),
+        ...followUpWrites.map((event) => event.detail),
+        ...persistenceWrites.map((event) => event.detail),
+      ]).slice(0, MAX_EVIDENCE),
+      signalIds: ["credential-prompt"],
+      confidence: 94,
+    };
+  }
+
+  return undefined;
+}
+
+function buildReverseShellFinding(
+  telemetry: DetonationTelemetryEvent[],
+  staticAnalysis: ReturnType<typeof analyzeSkillSnapshot>,
+): DetonationFinding | undefined {
+  const shellExecutions = telemetry.filter(
+    (event) =>
+      event.type === "process" &&
+      event.process &&
+      [event.process.command, ...event.process.args].some((value) => /\/bin\/sh\b/i.test(value)),
+  );
+  const networkEvents = telemetry.filter((event) => event.type === "network" && event.network);
+  if (shellExecutions.length > 0 && networkEvents.length > 0) {
+    return {
+      ruleId: "CG-DET-REVERSE-SHELL",
+      severity: "critical",
+      message: "Behavioral detonation observed a shell spawned alongside outbound network activity.",
+      evidence: unique([
+        ...shellExecutions.map((event) => event.detail),
+        ...networkEvents.map((event) => event.detail),
+      ]).slice(0, MAX_EVIDENCE),
+      signalIds: ["interactive-shell", "network-capability"],
+      confidence: 97,
+    };
+  }
+
+  const interactiveShellSignal = staticAnalysis.signals.find(
+    (signal) => signal.id === "interactive-shell",
+  );
+  if (!interactiveShellSignal) {
+    return undefined;
+  }
+
+  const stepGroups = groupTelemetryByStep(telemetry);
+  for (const group of stepGroups.values()) {
+    const suspiciousExecutions = group.filter(
+      (event) =>
+        event.type === "process" &&
+        event.process &&
+        !isInternalHelperExecution(event.process) &&
+        (processLooksLikeInterpreterExecution(event.process) ||
+          processLooksLikeLocalScript(event.process)),
+    );
+    const groupedNetworkEvents = group.filter((event) => event.type === "network" && event.network);
+    if (suspiciousExecutions.length === 0 || groupedNetworkEvents.length === 0) {
+      continue;
+    }
+
+    return {
+      ruleId: "CG-DET-REVERSE-SHELL",
+      severity: "critical",
+      message:
+        "Behavioral detonation observed outbound network activity while executing code with reverse-shell capability.",
+      evidence: unique([
+        ...suspiciousExecutions.map((event) => event.detail),
+        ...groupedNetworkEvents.map((event) => event.detail),
+        ...interactiveShellSignal.evidence,
+      ]).slice(0, MAX_EVIDENCE),
+      signalIds: ["interactive-shell", "network-capability"],
+      confidence: 90,
+    };
+  }
+
+  return undefined;
 }
 
 function buildSuspiciousNetworkChainFinding(
@@ -533,6 +726,44 @@ function processLooksLikeNetworkUtility(
   return ["nc", "ncat", "ssh", "scp"].includes(command);
 }
 
+function processLooksLikeCredentialHarvesting(
+  process: NonNullable<DetonationTelemetryEvent["process"]>,
+): boolean {
+  const command = path.posix.basename(process.command).toLowerCase();
+  const commandLine = [process.command, ...process.args].join(" ");
+  if (command === "osascript") {
+    return (
+      /\bdisplay\s+dialog\b/i.test(commandLine) &&
+      /\bhidden\s+answer\b/i.test(commandLine) &&
+      /\bpassword\b/i.test(commandLine)
+    );
+  }
+
+  if (command === "zenity") {
+    return /\b--password\b/i.test(commandLine);
+  }
+
+  return /\bgetpass(?:\.getpass)?\b/i.test(commandLine) || /\bread\s+-s\b/i.test(commandLine);
+}
+
+function processLooksLikeSecretExfiltration(
+  process: NonNullable<DetonationTelemetryEvent["process"]>,
+): boolean {
+  const command = path.posix.basename(process.command).toLowerCase();
+  const commandLine = [process.command, ...process.args].join(" ");
+
+  if (command !== "curl" && command !== "wget" && command !== "python3" && command !== "python") {
+    return false;
+  }
+
+  return (
+    /\b(?:-X|--request)\s*POST\b/i.test(commandLine) ||
+    /\b(?:-d|--data|--data-binary)\b/i.test(commandLine) ||
+    /\bwebhook\b/i.test(commandLine) ||
+    /@\/home\/clawguard\//i.test(commandLine)
+  );
+}
+
 function isInternalHelperExecution(
   process: NonNullable<DetonationTelemetryEvent["process"]>,
 ): boolean {
@@ -579,13 +810,36 @@ function pathMatchesChangedFile(candidate: string, changedPaths: Set<string>): b
 
 function isHoneypotPath(targetPath: string): boolean {
   return (
-    targetPath === defaultDetonationSandboxLayout.honeypots.envFile ||
-    targetPath === defaultDetonationSandboxLayout.honeypots.sshKey
+    defaultDetonationHoneypotPaths.envFiles.includes(
+      targetPath as (typeof defaultDetonationHoneypotPaths.envFiles)[number],
+    ) ||
+    defaultDetonationHoneypotPaths.sshKeys.includes(
+      targetPath as (typeof defaultDetonationHoneypotPaths.sshKeys)[number],
+    )
   );
 }
 
 function compactFindings(findings: Array<DetonationFinding | undefined>): DetonationFinding[] {
   return findings.filter((finding): finding is DetonationFinding => finding !== undefined);
+}
+
+function groupTelemetryByStep(
+  telemetry: DetonationTelemetryEvent[],
+): Map<string, DetonationTelemetryEvent[]> {
+  const groups = new Map<string, DetonationTelemetryEvent[]>();
+
+  for (const event of telemetry) {
+    const stepId = event.stepId ?? "global";
+    const existing = groups.get(stepId);
+    if (existing) {
+      existing.push(event);
+      continue;
+    }
+
+    groups.set(stepId, [event]);
+  }
+
+  return groups;
 }
 
 function unique(values: string[]): string[] {

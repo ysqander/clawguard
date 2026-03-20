@@ -9,6 +9,7 @@ import type { ContainerRuntimeDetector, DetectedContainerRuntime } from "@clawgu
 import {
   createChildProcessRuntimeCommandExecutor,
   createDetonationRuntimeProvider,
+  defaultSandboxImageTag,
   RuntimeCommandTimeoutError,
 } from "./index.js";
 import { resolveDefaultSandboxBuildAssets } from "./runtime-provider.js";
@@ -165,8 +166,8 @@ test("runtime providers share image-cache semantics across podman and docker", a
 
           const isImageCheck =
             runtime === "podman"
-              ? args.join(" ") === "image exists ghcr.io/clawguard/detonation-sandbox:0.1.0"
-              : args.join(" ") === "image inspect ghcr.io/clawguard/detonation-sandbox:0.1.0";
+              ? args.join(" ") === `image exists ${defaultSandboxImageTag}`
+              : args.join(" ") === `image inspect ${defaultSandboxImageTag}`;
 
           if (isImageCheck) {
             return {
@@ -251,7 +252,7 @@ test("ensureSandboxImage falls back to pulling when an explicit build context is
       async run(command, args) {
         commandCalls.push({ command, args });
 
-        if (args.join(" ") === "image inspect ghcr.io/clawguard/detonation-sandbox:0.1.0") {
+        if (args.join(" ") === `image inspect ${defaultSandboxImageTag}`) {
           return {
             exitCode: 1,
             stdout: "",

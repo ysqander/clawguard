@@ -4,8 +4,10 @@ import { lstat, readFile, readdir, readlink } from "node:fs/promises";
 import path from "node:path";
 
 import type { DetonationRequest } from "@clawguard/contracts";
+import { analyzeSkillSnapshot, type SkillThreatAnalysis } from "@clawguard/scanner";
 
 import {
+  defaultDetonationSandboxLayout,
   prepareDetonationEnvironment,
   runSandboxCommand,
   type PreparedDetonationEnvironment,
@@ -15,6 +17,7 @@ import type { DetonationRuntimeProvider, RuntimeCommandResult } from "./runtime-
 
 const DEFAULT_MIN_PROMPTS = 3;
 const DEFAULT_MAX_PROMPTS = 5;
+const MAX_SYNTHETIC_EXERCISES = 5;
 
 const DEFAULT_PROMPT_CANDIDATES = [
   "Review SKILL.md and summarize declared capabilities.",
@@ -25,7 +28,7 @@ const DEFAULT_PROMPT_CANDIDATES = [
 ] as const;
 
 const SETUP_SECTION_CUE =
-  /\b(set\s*up|setup|install(?:ation)?|initialize|initialise|bootstrap|requirements?|before first use)\b/i;
+  /\b(set\s*up|setup|install(?:ation)?|initialize|initialise|bootstrap|prerequisites?|requirements?|before first use)\b/i;
 const WORKFLOW_SECTION_CUE = /\b(workflows?|usage|commands?)\b/i;
 const POSITIVE_SENTENCE_CUE =
   /\b(run|execute|install|initialize|initialise|set up|clone|fetch|download|before first use)\b/i;
@@ -46,6 +49,10 @@ export type PromptRunnerStepIntent =
   | "execute-workflow"
   | "execute-workflow-variation"
   | "summarize-observed-intent"
+  | "synthetic-secret-read"
+  | "synthetic-memory-mutation"
+  | "synthetic-credential-prompt"
+  | "synthetic-outbound-post"
   | "custom-prompt"
   | "follow-declared-setup-instructions";
 
@@ -147,6 +154,15 @@ interface CommandCandidate {
   context: string;
 }
 
+interface SyntheticExercise {
+  intent:
+    | "synthetic-secret-read"
+    | "synthetic-memory-mutation"
+    | "synthetic-credential-prompt"
+    | "synthetic-outbound-post";
+  command: string;
+}
+
 interface StepInvocation {
   command: string;
   args: string[];
@@ -166,8 +182,15 @@ export async function buildPromptRunnerPlan(
   const maxPrompts = Math.max(minPrompts, options.maxPrompts ?? DEFAULT_MAX_PROMPTS);
   const markdown = options.skillMarkdown ?? (await loadSkillMarkdown(request));
   const sections = parseMarkdownSections(markdown);
-  const setupCommands = extractSetupCommands(sections);
-  const workflowCommands = extractWorkflowCommands(sections).slice(0, 2);
+  const setupCommands = extractSetupCommands(sections).map(normalizeShellCommandForSandbox);
+  const workflowCommands = extractWorkflowCommands(sections)
+    .slice(0, 2)
+    .map(normalizeShellCommandForSandbox);
+  const staticAnalysis = analyzeSkillSnapshot(request.snapshot);
+  const syntheticExercises = buildSyntheticExercises(staticAnalysis, setupCommands).slice(
+    0,
+    MAX_SYNTHETIC_EXERCISES,
+  );
 
   const promptPool = [...request.prompts, ...DEFAULT_PROMPT_CANDIDATES].map((prompt) =>
     prompt.trim(),
@@ -210,6 +233,16 @@ export async function buildPromptRunnerPlan(
           intent: "follow-declared-setup-instructions",
           executor: "shell-command",
           value: command,
+        });
+      });
+
+      syntheticExercises.forEach((exercise, exerciseIndex) => {
+        steps.push({
+          id: `synthetic-${exerciseIndex + 1}`,
+          type: "setup-command",
+          intent: exercise.intent,
+          executor: "shell-command",
+          value: exercise.command,
         });
       });
     }
@@ -582,6 +615,110 @@ function extractWorkflowCommands(sections: MarkdownSection[]): string[] {
   return commands;
 }
 
+function buildSyntheticExercises(
+  analysis: SkillThreatAnalysis,
+  existingSetupCommands: string[],
+): SyntheticExercise[] {
+  const exercises: SyntheticExercise[] = [];
+  const existingCommands = new Set(existingSetupCommands.map((command) => normalizeCommandBlock([command])));
+
+  for (const secretTarget of analysis.hints.secretTargets) {
+    const resolvedTarget = resolveContainerPath(secretTarget);
+    const command = `cat ${toShellLiteral(resolvedTarget)} >/dev/null`;
+    if (existingCommands.has(command)) {
+      continue;
+    }
+
+    existingCommands.add(command);
+    exercises.push({
+      intent: "synthetic-secret-read",
+      command,
+    });
+  }
+
+  for (const mutation of analysis.hints.memoryMutations) {
+    const targetPath = defaultDetonationSandboxLayout.memoryFiles[mutation.target];
+    const content = mutation.lines.join("\n");
+    if (content.length === 0) {
+      continue;
+    }
+
+    const command = [
+      `cat <<'CLAWGUARD_EOF' >> ${toShellLiteral(targetPath)}`,
+      content,
+      "CLAWGUARD_EOF",
+    ].join("\n");
+    if (existingCommands.has(command)) {
+      continue;
+    }
+
+    existingCommands.add(command);
+    exercises.push({
+      intent: "synthetic-memory-mutation",
+      command,
+    });
+  }
+
+  for (const promptCommand of analysis.hints.credentialPrompts) {
+    const normalized = normalizeCommandBlock([promptCommand]);
+    if (normalized.length === 0 || existingCommands.has(normalized)) {
+      continue;
+    }
+
+    existingCommands.add(normalized);
+    exercises.push({
+      intent: "synthetic-credential-prompt",
+      command: normalized,
+    });
+  }
+
+  for (const request of analysis.hints.outboundRequests) {
+    if (request.method !== "POST") {
+      continue;
+    }
+
+    const payloadPath = request.payloadPath
+      ? resolveContainerPath(request.payloadPath.replace(/^@/u, ""))
+      : resolveContainerPath(analysis.hints.secretTargets[0] ?? "~/.openclaw/.env");
+    const command =
+      `curl -fsS -X POST ${toShellLiteral(request.url)} --data-binary @${toShellLiteral(payloadPath)} >/dev/null 2>&1 || true`;
+    if (existingCommands.has(command)) {
+      continue;
+    }
+
+    existingCommands.add(command);
+    exercises.push({
+      intent: "synthetic-outbound-post",
+      command,
+    });
+  }
+
+  return exercises.slice(0, MAX_SYNTHETIC_EXERCISES);
+}
+
+function resolveContainerPath(value: string): string {
+  const trimmed = value.trim();
+  const withoutDataPrefix = trimmed.replace(/^@/u, "");
+  if (withoutDataPrefix.startsWith(defaultDetonationSandboxLayout.homeDir)) {
+    return withoutDataPrefix;
+  }
+  if (withoutDataPrefix.startsWith("~/")) {
+    return path.posix.join(defaultDetonationSandboxLayout.homeDir, withoutDataPrefix.slice(2));
+  }
+
+  return withoutDataPrefix;
+}
+
+function normalizeShellCommandForSandbox(value: string): string {
+  return value
+    .replaceAll(/@~\/([^\s"'`]+)/gu, (_, relativePath: string) => {
+      return `@${path.posix.join(defaultDetonationSandboxLayout.homeDir, relativePath)}`;
+    })
+    .replaceAll(/(^|[\s"'`])~\/([^\s"'`]+)/gu, (_, prefix: string, relativePath: string) => {
+      return `${prefix}${path.posix.join(defaultDetonationSandboxLayout.homeDir, relativePath)}`;
+    });
+}
+
 function collectSectionCommandCandidates(section: MarkdownSection): CommandCandidate[] {
   const candidates: CommandCandidate[] = [];
   let inCodeFence = false;
@@ -728,7 +865,7 @@ function looksLikeRunnableCommand(value: string): boolean {
 function looksLikeRunnableCommandLine(value: string): boolean {
   const trimmed = value.trim();
   const toolCommand =
-    /(?:^|(?:&&|\|\||\|)\s*)(?:bash|sh|zsh|node|python(?:3)?|npm|pnpm|npx|pip|curl|wget|git)\b/i;
+    /(?:^|(?:&&|\|\||\|)\s*)(?:bash|sh|zsh|node|python(?:3)?|npm|pnpm|npx|pip|curl|wget|git|osascript)\b/i;
   const localExecutable = /(?:^|(?:&&|\|\||\|)\s*)(?:\.\/|scripts\/)\S+/u;
 
   return (
@@ -742,7 +879,9 @@ function looksLikeStandaloneCommandLine(value: string): boolean {
   const trimmed = value.trim();
 
   return (
-    /^(?:bash|sh|zsh|node|python(?:3)?|npm|pnpm|npx|pip|curl|wget|git)\b/i.test(trimmed) ||
+    /^(?:bash|sh|zsh|node|python(?:3)?|npm|pnpm|npx|pip|curl|wget|git|osascript)\b/i.test(
+      trimmed,
+    ) ||
     /^(?:\.\/|scripts\/)\S+/u.test(trimmed) ||
     (/^chmod\s+\+x\b/i.test(trimmed) && /(?:\.\/|scripts\/)\S+/u.test(trimmed))
   );
@@ -822,7 +961,7 @@ function buildStepInvocation(
   if (step.executor === "shell-command") {
     return {
       command: "bash",
-      args: ["-lc", `cd ${toShellLiteral(environment.container.skillDir)} && ${step.value}`],
+      args: ["-c", `cd ${toShellLiteral(environment.container.skillDir)} && ${step.value}`],
     };
   }
 

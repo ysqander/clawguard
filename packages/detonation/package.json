@@ -24,7 +24,8 @@
   "dependencies": {
     "@clawguard/contracts": "workspace:*",
     "@clawguard/fixtures": "workspace:*",
-    "@clawguard/platform": "workspace:*"
+    "@clawguard/platform": "workspace:*",
+    "@clawguard/scanner": "workspace:*"
   },
   "devDependencies": {
     "@clawguard/discovery": "workspace:*",

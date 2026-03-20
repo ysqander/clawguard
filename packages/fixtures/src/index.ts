@@ -13,6 +13,7 @@ export interface SkillFixtureDefinition {
   description: string;
   relativePath: string;
   expectedRuleIds: string[];
+  expectedDetonationRuleIds: string[];
   benchmarkTags: string[];
 }
 
@@ -26,7 +27,8 @@ export const skillFixtureCorpus: SkillFixtureDefinition[] = [
     description: "High-quality local calendar summarizer with explicit safety controls.",
     relativePath: "benign-calendar-helper",
     expectedRuleIds: [],
-    benchmarkTags: ["static", "detonation-target"],
+    expectedDetonationRuleIds: [],
+    benchmarkTags: ["static"],
   },
   {
     id: "benign-release-notes",
@@ -35,6 +37,7 @@ export const skillFixtureCorpus: SkillFixtureDefinition[] = [
     description: "Benign software-engineering helper used to track false positives.",
     relativePath: "benign-release-notes",
     expectedRuleIds: [],
+    expectedDetonationRuleIds: [],
     benchmarkTags: ["static"],
   },
   {
@@ -44,6 +47,27 @@ export const skillFixtureCorpus: SkillFixtureDefinition[] = [
     description: "Benign incident-reporting skill with no privileged workflows.",
     relativePath: "benign-incident-summary",
     expectedRuleIds: [],
+    expectedDetonationRuleIds: [],
+    benchmarkTags: ["static"],
+  },
+  {
+    id: "benign-markdown-formatter",
+    slug: "markdown-table-formatter",
+    intent: "benign",
+    description: "Benign markdown table formatter used as a true-negative control.",
+    relativePath: "benign-markdown-formatter",
+    expectedRuleIds: [],
+    expectedDetonationRuleIds: [],
+    benchmarkTags: ["static", "detonation-target"],
+  },
+  {
+    id: "benign-remote-content-researcher",
+    slug: "remote-content-researcher",
+    intent: "benign",
+    description: "Benign URL summarizer that should stay at review for third-party content exposure.",
+    relativePath: "benign-remote-content-researcher",
+    expectedRuleIds: ["CG-RULE-THIRD-PARTY-CONTENT"],
+    expectedDetonationRuleIds: [],
     benchmarkTags: ["static"],
   },
   {
@@ -53,7 +77,8 @@ export const skillFixtureCorpus: SkillFixtureDefinition[] = [
     description: "Malicious staged download chain through an install helper script.",
     relativePath: "malicious-staged-download",
     expectedRuleIds: ["CG-RULE-STAGED-DOWNLOAD"],
-    benchmarkTags: ["static", "detonation-target"],
+    expectedDetonationRuleIds: ["CG-DET-STAGED-DOWNLOAD-EXECUTE"],
+    benchmarkTags: ["static"],
   },
   {
     id: "malicious-memory-poisoning",
@@ -62,7 +87,8 @@ export const skillFixtureCorpus: SkillFixtureDefinition[] = [
     description: "Malicious memory-poisoning and persistent state tampering instructions.",
     relativePath: "malicious-memory-poisoning",
     expectedRuleIds: ["CG-RULE-MEMORY-TAMPERING"],
-    benchmarkTags: ["static", "detonation-target"],
+    expectedDetonationRuleIds: ["CG-DET-MEMORY-MUTATION"],
+    benchmarkTags: ["static"],
   },
   {
     id: "malicious-exfiltration",
@@ -71,7 +97,85 @@ export const skillFixtureCorpus: SkillFixtureDefinition[] = [
     description: "Malicious exfiltration instructions disguised as reporting sync steps.",
     relativePath: "malicious-exfiltration",
     expectedRuleIds: ["CG-RULE-EXFILTRATION"],
+    expectedDetonationRuleIds: ["CG-DET-HONEYPOT-ACCESS"],
+    benchmarkTags: ["static"],
+  },
+  {
+    id: "clawhavoc-staged-installer",
+    slug: "solana-wallet-tracker",
+    intent: "malicious",
+    description: "ClickFix-style staged installer that pushes curl-to-shell and remote archives.",
+    relativePath: "clawhavoc-staged-installer",
+    expectedRuleIds: ["CG-RULE-STAGED-DOWNLOAD"],
+    expectedDetonationRuleIds: [
+      "CG-DET-STAGED-DOWNLOAD-EXECUTE",
+      "CG-DET-SUSPICIOUS-NETWORK-CHAIN",
+    ],
     benchmarkTags: ["static", "detonation-target"],
+  },
+  {
+    id: "env-exfil-weather",
+    slug: "weather-assistant-pro",
+    intent: "malicious",
+    description: "Instruction-only credential exfiltration through a fake verification POST.",
+    relativePath: "env-exfil-weather",
+    expectedRuleIds: ["CG-RULE-EXFILTRATION", "CG-RULE-CREDENTIAL-ACCESS"],
+    expectedDetonationRuleIds: ["CG-DET-HONEYPOT-ACCESS", "CG-DET-SUSPICIOUS-NETWORK-CHAIN"],
+    benchmarkTags: ["static", "detonation-target"],
+  },
+  {
+    id: "memory-poison-preference",
+    slug: "productivity-optimizer",
+    intent: "malicious",
+    description: "Preference-framed MEMORY.md poisoning that disables safeguards.",
+    relativePath: "memory-poison-preference",
+    expectedRuleIds: ["CG-RULE-MEMORY-TAMPERING", "CG-RULE-PROMPT-INJECTION"],
+    expectedDetonationRuleIds: ["CG-DET-MEMORY-MUTATION"],
+    benchmarkTags: ["static", "detonation-target"],
+  },
+  {
+    id: "stego-soul-pack",
+    slug: "senior-react-dev-soul",
+    intent: "malicious",
+    description: "Steganographic SOUL.md payload using hidden base64 and invisible Unicode.",
+    relativePath: "stego-soul-pack",
+    expectedRuleIds: ["CG-RULE-OBFUSCATION", "CG-RULE-MEMORY-TAMPERING"],
+    expectedDetonationRuleIds: [],
+    benchmarkTags: ["static"],
+  },
+  {
+    id: "fake-password-dialog",
+    slug: "system-maintenance-pro",
+    intent: "malicious",
+    description: "AppleScript password-harvesting dialog disguised as installer auth.",
+    relativePath: "fake-password-dialog",
+    expectedRuleIds: ["CG-RULE-CREDENTIAL-ACCESS"],
+    expectedDetonationRuleIds: ["CG-DET-CREDENTIAL-HARVESTING"],
+    benchmarkTags: ["static", "detonation-target"],
+  },
+  {
+    id: "prompt-injection-override",
+    slug: "meeting-notes-formatter",
+    intent: "malicious",
+    description: "HTML-comment prompt override that steals local secrets and hides the output.",
+    relativePath: "prompt-injection-override",
+    expectedRuleIds: ["CG-RULE-PROMPT-INJECTION", "CG-RULE-CREDENTIAL-ACCESS"],
+    expectedDetonationRuleIds: ["CG-DET-HONEYPOT-ACCESS"],
+    benchmarkTags: ["static", "detonation-target"],
+  },
+  {
+    id: "typoglycemia-prompt-override",
+    slug: "inbox-priority-triager",
+    intent: "malicious",
+    description: "Prompt override hidden behind spacing and typoglycemia normalization.",
+    relativePath: "typoglycemia-prompt-override",
+    expectedRuleIds: [
+      "CG-RULE-PROMPT-INJECTION",
+      "CG-RULE-CREDENTIAL-ACCESS",
+      "CG-RULE-OBFUSCATION",
+    ],
+    expectedDetonationRuleIds: [],
+    benchmarkTags: ["static"],
   },
 ];
 

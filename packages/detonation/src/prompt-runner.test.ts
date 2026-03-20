@@ -398,6 +398,9 @@ function createStubPrepareEnvironment(
       skillDir: "/tmp/root/workspace/skills/synthetic-skill",
       helpers: {
         promptHarness: "/tmp/root/workspace/.clawguard/prompt-harness.mjs",
+        binDir: "/tmp/root/workspace/.clawguard/bin",
+        osascript: "/tmp/root/workspace/.clawguard/bin/osascript",
+        zenity: "/tmp/root/workspace/.clawguard/bin/zenity",
       },
       memoryFiles: {
         memory: "/tmp/root/workspace/MEMORY.md",
@@ -418,6 +421,9 @@ function createStubPrepareEnvironment(
       skillDir: "/tmp/root/baseline/workspace/skills/synthetic-skill",
       helpers: {
         promptHarness: "/tmp/root/baseline/workspace/.clawguard/prompt-harness.mjs",
+        binDir: "/tmp/root/baseline/workspace/.clawguard/bin",
+        osascript: "/tmp/root/baseline/workspace/.clawguard/bin/osascript",
+        zenity: "/tmp/root/baseline/workspace/.clawguard/bin/zenity",
       },
       memoryFiles: {
         memory: "/tmp/root/baseline/workspace/MEMORY.md",
@@ -437,6 +443,9 @@ function createStubPrepareEnvironment(
       skillDir: "/workspace/openclaw/skills/synthetic-skill",
       helpers: {
         promptHarness: "/workspace/openclaw/.clawguard/prompt-harness.mjs",
+        binDir: "/workspace/openclaw/.clawguard/bin",
+        osascript: "/workspace/openclaw/.clawguard/bin/osascript",
+        zenity: "/workspace/openclaw/.clawguard/bin/zenity",
       },
       memoryFiles: {
         memory: "/workspace/openclaw/MEMORY.md",

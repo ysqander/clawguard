@@ -8,6 +8,7 @@
   "references": [
     { "path": "../contracts" },
     { "path": "../platform" },
+    { "path": "../scanner" },
     { "path": "../fixtures" },
     { "path": "../discovery" }
   ]

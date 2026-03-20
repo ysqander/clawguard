@@ -7,11 +7,16 @@ test("fixture corpus includes benign and malicious coverage", () => {
   const benign = listSkillFixtures({ includeIntent: ["benign"] });
   const malicious = listSkillFixtures({ includeIntent: ["malicious"] });
 
-  assert.ok(benign.length >= 3);
-  assert.ok(malicious.length >= 3);
-  assert.ok(malicious.some((fixture) => fixture.id === "malicious-staged-download"));
-  assert.ok(malicious.some((fixture) => fixture.id === "malicious-memory-poisoning"));
-  assert.ok(malicious.some((fixture) => fixture.id === "malicious-exfiltration"));
+  assert.ok(benign.length >= 4);
+  assert.ok(malicious.length >= 8);
+  assert.ok(benign.some((fixture) => fixture.id === "benign-remote-content-researcher"));
+  assert.ok(malicious.some((fixture) => fixture.id === "clawhavoc-staged-installer"));
+  assert.ok(malicious.some((fixture) => fixture.id === "env-exfil-weather"));
+  assert.ok(malicious.some((fixture) => fixture.id === "memory-poison-preference"));
+  assert.ok(malicious.some((fixture) => fixture.id === "stego-soul-pack"));
+  assert.ok(malicious.some((fixture) => fixture.id === "fake-password-dialog"));
+  assert.ok(malicious.some((fixture) => fixture.id === "prompt-injection-override"));
+  assert.ok(malicious.some((fixture) => fixture.id === "typoglycemia-prompt-override"));
 });
 
 test("loadFixtureSnapshot produces deterministic inventory with SKILL.md", () => {
@@ -30,10 +35,12 @@ test("detonation-target benchmark selection is explicit and non-empty", () => {
   assert.deepEqual(
     fixtures.map((fixture) => fixture.id),
     [
-      "benign-calendar-helper",
-      "malicious-staged-download",
-      "malicious-memory-poisoning",
-      "malicious-exfiltration",
+      "benign-markdown-formatter",
+      "clawhavoc-staged-installer",
+      "env-exfil-weather",
+      "memory-poison-preference",
+      "fake-password-dialog",
+      "prompt-injection-override",
     ],
   );
 });

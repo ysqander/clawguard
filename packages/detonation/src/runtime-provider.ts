@@ -8,7 +8,7 @@ import { createPlatformAdapter, type ContainerRuntimeDetector } from "@clawguard
 export type DetonationRuntime = DetonationRuntimeKind;
 
 export const defaultDetonationRuntime: DetonationRuntimeKind = "podman";
-export const defaultSandboxImageTag = "ghcr.io/clawguard/detonation-sandbox:0.1.0";
+export const defaultSandboxImageTag = "ghcr.io/clawguard/detonation-sandbox:0.2.0";
 
 export interface ResolvedSandboxBuildAssets {
   containerfilePath: string;

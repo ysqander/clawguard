@@ -152,6 +152,8 @@ export interface StaticFinding {
   severity: FindingSeverity;
   message: string;
   evidence: string[];
+  signalIds?: string[];
+  confidence?: number;
 }
 
 export interface StaticScanReport {
@@ -197,6 +199,8 @@ export interface DetonationFinding {
   severity: FindingSeverity;
   message: string;
   evidence: string[];
+  signalIds?: string[];
+  confidence?: number;
 }
 
 export const detonationRunStatuses = [
@@ -473,21 +477,35 @@ function parseSkillSnapshot(input: unknown, path: string): SkillSnapshot {
 }
 
 function parseStaticFinding(input: unknown, path: string): StaticFinding {
-  return parseObject(input, path, (record) => ({
-    ruleId: parseNonEmptyString(record.ruleId, `${path}.ruleId`),
-    severity: parseEnum(record.severity, findingSeverities, `${path}.severity`),
-    message: parseNonEmptyString(record.message, `${path}.message`),
-    evidence: parseStringArray(record.evidence, `${path}.evidence`),
-  }));
+  return parseObject(input, path, (record) => {
+    const signalIds = parseOptional(record.signalIds, parseStringArray, `${path}.signalIds`);
+    const confidence = parseOptional(record.confidence, parseInteger, `${path}.confidence`);
+
+    return {
+      ruleId: parseNonEmptyString(record.ruleId, `${path}.ruleId`),
+      severity: parseEnum(record.severity, findingSeverities, `${path}.severity`),
+      message: parseNonEmptyString(record.message, `${path}.message`),
+      evidence: parseStringArray(record.evidence, `${path}.evidence`),
+      ...(signalIds !== undefined ? { signalIds } : {}),
+      ...(confidence !== undefined ? { confidence } : {}),
+    };
+  });
 }
 
 function parseDetonationFinding(input: unknown, path: string): DetonationFinding {
-  return parseObject(input, path, (record) => ({
-    ruleId: parseNonEmptyString(record.ruleId, `${path}.ruleId`),
-    severity: parseEnum(record.severity, findingSeverities, `${path}.severity`),
-    message: parseNonEmptyString(record.message, `${path}.message`),
-    evidence: parseStringArray(record.evidence, `${path}.evidence`),
-  }));
+  return parseObject(input, path, (record) => {
+    const signalIds = parseOptional(record.signalIds, parseStringArray, `${path}.signalIds`);
+    const confidence = parseOptional(record.confidence, parseInteger, `${path}.confidence`);
+
+    return {
+      ruleId: parseNonEmptyString(record.ruleId, `${path}.ruleId`),
+      severity: parseEnum(record.severity, findingSeverities, `${path}.severity`),
+      message: parseNonEmptyString(record.message, `${path}.message`),
+      evidence: parseStringArray(record.evidence, `${path}.evidence`),
+      ...(signalIds !== undefined ? { signalIds } : {}),
+      ...(confidence !== undefined ? { confidence } : {}),
+    };
+  });
 }
 
 function parseStaticScanReport(input: unknown, path: string): StaticScanReport {

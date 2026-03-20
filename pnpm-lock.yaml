@@ -76,6 +76,9 @@ importers:
       '@clawguard/platform':
         specifier: workspace:*
         version: link:../platform
+      '@clawguard/scanner':
+        specifier: workspace:*
+        version: link:../scanner
     devDependencies:
       '@clawguard/discovery':
         specifier: workspace:*

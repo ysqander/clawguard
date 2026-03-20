@@ -22,6 +22,7 @@ import { createPlatformAdapter } from "@clawguard/platform";
 import {
   buildDetonationBenchmarkRequest,
   createDetonationRuntimeProvider,
+  defaultDetonationHoneypotPaths,
   defaultSandboxImageTag,
   defaultDetonationSandboxLayout,
   prepareDetonationEnvironment,
@@ -46,6 +47,8 @@ test("prepareDetonationEnvironment creates the expected layout and baseline", as
     await assertPathExists(environment.host.honeypots.envFile);
     await assertPathExists(environment.host.honeypots.sshKey);
     await assertPathExists(environment.host.helpers.promptHarness);
+    await assertPathExists(environment.host.helpers.osascript);
+    await assertPathExists(environment.host.helpers.zenity);
     await assertPathExists(path.join(environment.host.workspaceDir, ".clawguard", "traces"));
     await assertPathExists(path.join(environment.host.skillDir, "SKILL.md"));
     await assertPathExists(path.join(environment.host.skillDir, "scripts", "install.sh"));
@@ -61,6 +64,11 @@ test("prepareDetonationEnvironment creates the expected layout and baseline", as
 
     const sshStats = await stat(environment.host.honeypots.sshKey);
     assert.equal(sshStats.mode & 0o777, 0o600);
+
+    for (const aliasPath of defaultDetonationHoneypotPaths.envFiles) {
+      const relativePath = path.posix.relative(defaultDetonationSandboxLayout.homeDir, aliasPath);
+      await assertPathExists(path.join(environment.host.homeDir, ...relativePath.split("/")));
+    }
   } finally {
     await environment.cleanup();
   }

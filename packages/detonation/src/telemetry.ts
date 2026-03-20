@@ -216,7 +216,7 @@ function collectTelemetry(
 
     pushEvent({
       type: "memory",
-      detail: `Memory file changed: ${diff.name}`,
+      detail: describeMemoryDiff(diff),
       observedAt: lastObservedAt,
       memory: {
         name: diff.name,
@@ -598,6 +598,21 @@ function describeFileObservation(file: DetonationFileObservation): string {
 
 function describeFileChange(change: PromptRunnerFileChange): string {
   return `${change.kind} ${change.path}`;
+}
+
+function describeMemoryDiff(diff: PromptRunnerResult["memoryDiffs"][number]): string {
+  const insertedLines = diff.currentContent
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("#") && !line.startsWith("##"))
+    .filter((line) => !diff.baselineContent.includes(line))
+    .slice(0, 3);
+
+  if (insertedLines.length === 0) {
+    return `Memory file changed: ${diff.name}`;
+  }
+
+  return `Memory file changed: ${diff.name} -> ${insertedLines.join(" | ")}`;
 }
 
 function toFileOperation(kind: PromptRunnerFileChange["kind"]): DetonationFileOperation {

@@ -35,4 +35,10 @@ test("detonationReportValidator accepts telemetry events with typed observations
   assert.equal(parsed.telemetry?.[0]?.type, "network");
   assert.equal(parsed.telemetry?.[0]?.network?.address, "93.184.216.34");
   assert.equal(parsed.telemetry?.[0]?.indicator?.subjectType, "domain");
+  assert.deepEqual(parsed.findings[0]?.signalIds, [
+    "download-source",
+    "execute-sink",
+    "network-capability",
+  ]);
+  assert.equal(parsed.findings[0]?.confidence, 95);
 });

@@ -58,7 +58,10 @@ bHktZG8tbm90LXVzZS1mb3ItYXV0aGVudGljYXRpb24K
 `;
 
 const PROMPT_HARNESS_RELATIVE_PATH = ".clawguard/prompt-harness.mjs";
+const HELPER_BIN_RELATIVE_PATH = ".clawguard/bin";
 const TRACE_DIRECTORY_RELATIVE_PATH = ".clawguard/traces";
+const DEFAULT_SANDBOX_PATH =
+  "/workspace/openclaw/.clawguard/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const PROMPT_HARNESS_SOURCE = `import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -120,7 +123,7 @@ async function runWorkflowCommand(skillDir, workflowCommand) {
   return await new Promise((resolve, reject) => {
     const child = spawn(
       "bash",
-      ["-lc", \`cd \${toShellLiteral(skillDir)} && \${workflowCommand}\`],
+      ["-c", \`cd \${toShellLiteral(skillDir)} && \${workflowCommand}\`],
       {
         stdio: "pipe",
       },
@@ -185,6 +188,32 @@ async function main() {
 await main();
 `;
 
+const OSASCRIPT_SHIM_SOURCE = `#!/usr/bin/env sh
+set -eu
+mkdir -p "$HOME/.openclaw"
+printf '%s\n' "cached-password=decoy-password" > "$HOME/.openclaw/session-auth.txt"
+printf '%s\n' "button returned:OK, text returned:decoy-password"
+`;
+
+const ZENITY_SHIM_SOURCE = `#!/usr/bin/env sh
+set -eu
+mkdir -p "$HOME/.openclaw"
+printf '%s\n' "cached-password=decoy-password" > "$HOME/.openclaw/session-auth.txt"
+printf '%s\n' "decoy-password"
+`;
+
+export const defaultDetonationHoneypotPaths = {
+  envFiles: [
+    "/home/clawguard/.env",
+    "/home/clawguard/.openclaw/.env",
+    "/home/clawguard/.clawdbot/.env",
+  ],
+  sshKeys: [
+    "/home/clawguard/.ssh/id_rsa",
+    "/home/clawguard/.ssh/id_ed25519",
+  ],
+} as const;
+
 export interface DetonationSandboxLayout {
   homeDir: string;
   configPath: string;
@@ -230,6 +259,9 @@ export interface PreparedDetonationEnvironmentPaths {
   skillDir: string;
   helpers: {
     promptHarness: string;
+    binDir: string;
+    osascript: string;
+    zenity: string;
   };
   memoryFiles: {
     memory: string;
@@ -255,6 +287,9 @@ export interface PreparedDetonationEnvironment {
     skillDir: string;
     helpers: {
       promptHarness: string;
+      binDir: string;
+      osascript: string;
+      zenity: string;
     };
     memoryFiles: DetonationSandboxLayout["memoryFiles"];
     honeypots: DetonationSandboxLayout["honeypots"];
@@ -280,6 +315,7 @@ export async function prepareDetonationEnvironment(
   await mkdir(path.dirname(host.configPath), { recursive: true });
   await mkdir(path.dirname(host.honeypots.sshKey), { recursive: true });
   await mkdir(path.dirname(host.helpers.promptHarness), { recursive: true });
+  await mkdir(host.helpers.binDir, { recursive: true });
   await mkdir(path.join(host.workspaceDir, TRACE_DIRECTORY_RELATIVE_PATH), { recursive: true });
   await mkdir(host.skillsDir, { recursive: true });
 
@@ -290,7 +326,12 @@ export async function prepareDetonationEnvironment(
   await writeFile(host.honeypots.envFile, HONEYPOT_ENV_TEXT, "utf8");
   await writeFile(host.honeypots.sshKey, HONEYPOT_SSH_KEY_TEXT, "utf8");
   await writeFile(host.helpers.promptHarness, PROMPT_HARNESS_SOURCE, "utf8");
+  await writeFile(host.helpers.osascript, OSASCRIPT_SHIM_SOURCE, "utf8");
+  await writeFile(host.helpers.zenity, ZENITY_SHIM_SOURCE, "utf8");
   await chmod(host.honeypots.sshKey, 0o600);
+  await chmod(host.helpers.osascript, 0o755);
+  await chmod(host.helpers.zenity, 0o755);
+  await writeHoneypotAliases(host);
 
   await copySnapshotFiles(request, host.skillDir);
 
@@ -326,6 +367,17 @@ export async function prepareDetonationEnvironment(
           defaultDetonationSandboxLayout.workspaceDir,
           PROMPT_HARNESS_RELATIVE_PATH,
         ),
+        binDir: path.posix.join(defaultDetonationSandboxLayout.workspaceDir, HELPER_BIN_RELATIVE_PATH),
+        osascript: path.posix.join(
+          defaultDetonationSandboxLayout.workspaceDir,
+          HELPER_BIN_RELATIVE_PATH,
+          "osascript",
+        ),
+        zenity: path.posix.join(
+          defaultDetonationSandboxLayout.workspaceDir,
+          HELPER_BIN_RELATIVE_PATH,
+          "zenity",
+        ),
       },
       memoryFiles: defaultDetonationSandboxLayout.memoryFiles,
       honeypots: defaultDetonationSandboxLayout.honeypots,
@@ -356,6 +408,8 @@ export async function runSandboxCommand(
       preparedEnvironment.container.workspaceDir,
       "--env",
       `HOME=${preparedEnvironment.container.homeDir}`,
+      "--env",
+      `PATH=${DEFAULT_SANDBOX_PATH}`,
       "--volume",
       `${preparedEnvironment.host.homeDir}:${preparedEnvironment.container.homeDir}`,
       "--volume",
@@ -414,6 +468,9 @@ function buildHostPaths(rootDir: string, slug: string): PreparedDetonationEnviro
     skillDir: path.join(skillsDir, slug),
     helpers: {
       promptHarness: path.join(workspaceDir, PROMPT_HARNESS_RELATIVE_PATH),
+      binDir: path.join(workspaceDir, HELPER_BIN_RELATIVE_PATH),
+      osascript: path.join(workspaceDir, HELPER_BIN_RELATIVE_PATH, "osascript"),
+      zenity: path.join(workspaceDir, HELPER_BIN_RELATIVE_PATH, "zenity"),
     },
     memoryFiles: {
       memory: path.join(workspaceDir, "MEMORY.md"),
@@ -429,6 +486,37 @@ function buildHostPaths(rootDir: string, slug: string): PreparedDetonationEnviro
 
 function buildBaselinePaths(rootDir: string, slug: string): PreparedDetonationEnvironmentPaths {
   return buildHostPaths(path.join(rootDir, "baseline"), slug);
+}
+
+async function writeHoneypotAliases(paths: PreparedDetonationEnvironmentPaths): Promise<void> {
+  for (const aliasPath of defaultDetonationHoneypotPaths.envFiles) {
+    if (aliasPath === defaultDetonationSandboxLayout.honeypots.envFile) {
+      continue;
+    }
+
+    const hostAliasPath = mapContainerHomePathToHost(paths, aliasPath);
+    await mkdir(path.dirname(hostAliasPath), { recursive: true });
+    await writeFile(hostAliasPath, HONEYPOT_ENV_TEXT, "utf8");
+  }
+
+  for (const aliasPath of defaultDetonationHoneypotPaths.sshKeys) {
+    if (aliasPath === defaultDetonationSandboxLayout.honeypots.sshKey) {
+      continue;
+    }
+
+    const hostAliasPath = mapContainerHomePathToHost(paths, aliasPath);
+    await mkdir(path.dirname(hostAliasPath), { recursive: true });
+    await writeFile(hostAliasPath, HONEYPOT_SSH_KEY_TEXT, "utf8");
+    await chmod(hostAliasPath, 0o600);
+  }
+}
+
+function mapContainerHomePathToHost(
+  paths: PreparedDetonationEnvironmentPaths,
+  containerPath: string,
+): string {
+  const relativePath = path.posix.relative(defaultDetonationSandboxLayout.homeDir, containerPath);
+  return path.join(paths.homeDir, ...relativePath.split("/"));
 }
 
 function renderOpenClawConfig(layout: DetonationSandboxLayout): string {

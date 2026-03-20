@@ -111,18 +111,18 @@ test("runDetonationBenchmark treats non-throwing failed steps as execution failu
     async runFixture(_provider, _request, fixture) {
       return {
         setupCommandCount: 0,
-        failedStepCount: fixture.id === "malicious-staged-download" ? 1 : 0,
+        failedStepCount: fixture.id === "clawhavoc-staged-installer" ? 1 : 0,
         telemetryCount: 1,
         artifactCount: 1,
         memoryChangeCount: 0,
         fileChangeCount: 0,
         triggeredActionCount: 1,
-        ...(fixture.id === "malicious-staged-download" ? { errorMessage: "workflow failed" } : {}),
+        ...(fixture.id === "clawhavoc-staged-installer" ? { errorMessage: "workflow failed" } : {}),
       };
     },
   });
 
-  const failedRow = summary.rows.find((row) => row.fixtureId === "malicious-staged-download");
+  const failedRow = summary.rows.find((row) => row.fixtureId === "clawhavoc-staged-installer");
 
   assert.equal(summary.passed, false);
   assert.equal(failedRow?.status, "failed");
@@ -130,7 +130,7 @@ test("runDetonationBenchmark treats non-throwing failed steps as execution failu
   assert.ok(
     summary.failures.some((failure) => {
       return (
-        failure.fixtureId === "malicious-staged-download" &&
+        failure.fixtureId === "clawhavoc-staged-installer" &&
         failure.reason === "execution-failed" &&
         failure.errorMessage === "workflow failed"
       );
@@ -151,7 +151,7 @@ test("runDetonationBenchmark records execution and budget regressions", async ()
       return createStubProvider();
     },
     async runFixture(_provider, _request, fixture) {
-      if (fixture.id === "malicious-staged-download") {
+      if (fixture.id === "clawhavoc-staged-installer") {
         throw new Error("synthetic detonation failure");
       }
 
@@ -172,7 +172,7 @@ test("runDetonationBenchmark records execution and budget regressions", async ()
   assert.ok(summary.failures.some((failure) => failure.reason === "execution-failed"));
   assert.ok(summary.failures.some((failure) => failure.reason === "budget-exceeded"));
   assert.equal(
-    summary.failures.filter((failure) => failure.fixtureId === "malicious-staged-download").length,
+    summary.failures.filter((failure) => failure.fixtureId === "clawhavoc-staged-installer").length,
     1,
   );
 });

@@ -10,7 +10,7 @@ This ticket plan converts the high-level implementation plan into deliverable wo
 
 ## Current snapshot
 
-As of 2026-03-19, the repo has landed the main code and documentation for `CG-001` through `CG-022`.
+As of 2026-03-20, the repo has landed the main code and documentation for `CG-001` through `CG-022`, plus the first post-launch hardening pass on generalized signal extraction, bounded synthetic detonation exercises, honeypot alias coverage, expanded sandbox tooling, and local-sink live runtime regression tests.
 
 `CG-020` now covers the reusable fixture corpus plus gated static and full detonation benchmark harnesses.
 
@@ -21,6 +21,48 @@ Milestone B behavioral validation coverage is complete after `CG-021` landed.
 Milestone C launch hardening is complete after `CG-022` landed.
 
 There are no remaining pre-launch implementation tickets in this plan.
+
+## Post-MVP hardening candidates
+
+### CG-023 Generalize static capability extraction
+
+Priority: `P2`
+Milestone: `Post-MVP`
+Depends on: `CG-009`, `CG-020`
+Status: `In Progress`
+
+Scope:
+
+- Normalize visible, hidden, decoded, and typo-normalized skill content into reusable signals.
+- Replace one-pattern-one-rule logic with capability-chain findings that explain which signals triggered.
+- Add review-only precursor rules for third-party-content exposure and unverifiable dependencies.
+
+Acceptance criteria:
+
+- Static findings include signal IDs and confidence when a capability chain triggers.
+- Benign remote-content skills degrade to `review`, not `block`.
+- Defensive guidance that quotes malicious phrases or commands does not trigger blocking findings.
+
+### CG-024 Generalize detonation exercise planning
+
+Priority: `P2`
+Milestone: `Post-MVP`
+Depends on: `CG-015`, `CG-020`
+Status: `In Progress`
+
+Scope:
+
+- Extend the prompt runner with bounded synthetic exercises derived from extracted static signals.
+- Expand honeypots with alias paths and sandbox helper shims so runtime tests can execute cross-platform setup flows.
+- Add local-sink runtime regressions for Docker and clean-skip parity coverage for Podman.
+- Expand the sandbox image so common scripted setup flows can execute without silently failing on missing interpreters or network utilities.
+
+Acceptance criteria:
+
+- Live Docker detonation catches the documented local secret exfiltration flow against a host-side sink server.
+- Live Docker detonation catches deterministic local staged-download and reverse-shell probes against host-side sinks.
+- Podman parity tests skip cleanly when the runtime is unavailable.
+- Detonation findings include step-local correlation for secret exfiltration, persistent instruction injection, and credential harvesting.
 
 ## Epic A: Monorepo Foundation
 
