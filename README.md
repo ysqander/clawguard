@@ -66,6 +66,25 @@ Threat classes currently covered by the shipped corpus include:
 
 The current runtime-backed results also show parity between Docker and Podman on the live detonation subset.
 
+## Built from Real Incidents
+
+ClawGuard's current protections were built from documented OpenClaw attacks and public defensive research, not from toy examples.
+
+The threat corpus currently covers:
+
+- ClawHavoc-style staged installers
+- silent `.env` and credential exfiltration
+- `MEMORY.md` and `SOUL.md` poisoning
+- reverse shells hidden in functional helper code
+- steganographic prompt payloads in comments and invisible Unicode
+- fake password dialogs and prompt-injection overrides
+- benign controls for false-positive testing
+
+Full scenario notes and the source appendix are here:
+
+- [Threat scenarios](docs/clawguard-threat-scenarios.md)
+- [Appendix A: Source Index](docs/clawguard-threat-scenarios.md#appendix-a-source-index)
+
 ## Requirements
 
 ### Core requirements
