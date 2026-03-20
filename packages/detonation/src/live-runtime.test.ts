@@ -113,9 +113,7 @@ async function runLiveSecretExfilRuntimeTest(
   }
 
   assert.equal(result.report.recommendation, "block");
-  assert.ok(
-    result.report.findings.some((finding) => finding.ruleId === "CG-DET-HONEYPOT-ACCESS"),
-  );
+  assert.ok(result.report.findings.some((finding) => finding.ruleId === "CG-DET-HONEYPOT-ACCESS"));
   assert.ok(
     result.report.findings.some((finding) => finding.ruleId === "CG-DET-SECRET-EXFIL-CHAIN"),
   );
@@ -257,9 +255,7 @@ async function runLiveReverseShellRuntimeTest(
   }
 
   assert.equal(result.report.recommendation, "block");
-  assert.ok(
-    result.report.findings.some((finding) => finding.ruleId === "CG-DET-REVERSE-SHELL"),
-  );
+  assert.ok(result.report.findings.some((finding) => finding.ruleId === "CG-DET-REVERSE-SHELL"));
   assert.ok(receivedChunks.some((chunk) => /\broot\b/u.test(chunk)));
 }
 

@@ -421,7 +421,10 @@ function buildSecretExfilChainFinding(
     );
     const networkEvents = group.filter((event) => event.type === "network" && event.network);
 
-    if (honeypotReads.length === 0 || (suspiciousProcesses.length === 0 && networkEvents.length === 0)) {
+    if (
+      honeypotReads.length === 0 ||
+      (suspiciousProcesses.length === 0 && networkEvents.length === 0)
+    ) {
       continue;
     }
 
@@ -553,7 +556,8 @@ function buildReverseShellFinding(
     return {
       ruleId: "CG-DET-REVERSE-SHELL",
       severity: "critical",
-      message: "Behavioral detonation observed a shell spawned alongside outbound network activity.",
+      message:
+        "Behavioral detonation observed a shell spawned alongside outbound network activity.",
       evidence: unique([
         ...shellExecutions.map((event) => event.detail),
         ...networkEvents.map((event) => event.detail),

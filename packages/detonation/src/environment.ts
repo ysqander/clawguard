@@ -208,10 +208,7 @@ export const defaultDetonationHoneypotPaths = {
     "/home/clawguard/.openclaw/.env",
     "/home/clawguard/.clawdbot/.env",
   ],
-  sshKeys: [
-    "/home/clawguard/.ssh/id_rsa",
-    "/home/clawguard/.ssh/id_ed25519",
-  ],
+  sshKeys: ["/home/clawguard/.ssh/id_rsa", "/home/clawguard/.ssh/id_ed25519"],
 } as const;
 
 export interface DetonationSandboxLayout {
@@ -367,7 +364,10 @@ export async function prepareDetonationEnvironment(
           defaultDetonationSandboxLayout.workspaceDir,
           PROMPT_HARNESS_RELATIVE_PATH,
         ),
-        binDir: path.posix.join(defaultDetonationSandboxLayout.workspaceDir, HELPER_BIN_RELATIVE_PATH),
+        binDir: path.posix.join(
+          defaultDetonationSandboxLayout.workspaceDir,
+          HELPER_BIN_RELATIVE_PATH,
+        ),
         osascript: path.posix.join(
           defaultDetonationSandboxLayout.workspaceDir,
           HELPER_BIN_RELATIVE_PATH,

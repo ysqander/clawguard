@@ -331,14 +331,16 @@ const capabilityChains: CapabilityChainDefinition[] = [
   {
     ruleId: "CG-RULE-MEMORY-TAMPERING",
     severity: "critical",
-    message: "Persistent memory mutation instructions appear designed to alter future agent behavior.",
+    message:
+      "Persistent memory mutation instructions appear designed to alter future agent behavior.",
     signalIds: ["memory-target", "persistence-directive"],
     minConfidence: 80,
   },
   {
     ruleId: "CG-RULE-MEMORY-TAMPERING",
     severity: "critical",
-    message: "Persistent memory mutation instructions appear designed to alter future agent behavior.",
+    message:
+      "Persistent memory mutation instructions appear designed to alter future agent behavior.",
     signalIds: ["memory-target", "obfuscation"],
     minConfidence: 80,
   },
@@ -476,7 +478,10 @@ function resolveSkillFilePath(skillRoot: string, relativePath: string): string |
   return absolutePath;
 }
 
-function buildNormalizedLines(textSources: TextSource[], fileInventory: string[]): NormalizedLine[] {
+function buildNormalizedLines(
+  textSources: TextSource[],
+  fileInventory: string[],
+): NormalizedLine[] {
   const lines: NormalizedLine[] = [];
 
   for (const source of textSources) {
@@ -608,8 +613,10 @@ function dedupeNormalizedLines(lines: NormalizedLine[]): NormalizedLine[] {
 function collectDecodedPayloads(
   text: string,
 ): Array<{ channel: "decoded-base64" | "decoded-hex" | "decoded-url"; text: string }> {
-  const decoded: Array<{ channel: "decoded-base64" | "decoded-hex" | "decoded-url"; text: string }> =
-    [];
+  const decoded: Array<{
+    channel: "decoded-base64" | "decoded-hex" | "decoded-url";
+    text: string;
+  }> = [];
   const seen = new Set<string>();
 
   for (const match of text.matchAll(BASE64_CANDIDATE_PATTERN)) {
@@ -841,7 +848,10 @@ function detectUnverifiableDependency(lines: NormalizedLine[]): ExtractedSignal 
   return createSignal("unverifiable-dependency", 70, matches);
 }
 
-function collectPatternMatches(lines: NormalizedLine[], patterns: readonly RegExp[]): SignalMatch[] {
+function collectPatternMatches(
+  lines: NormalizedLine[],
+  patterns: readonly RegExp[],
+): SignalMatch[] {
   return lines
     .filter(
       (line) =>
@@ -927,7 +937,9 @@ function buildFindings(signals: ExtractedSignal[]): StaticFinding[] {
   const signalMap = new Map(signals.map((signal) => [signal.id, signal]));
 
   for (const chain of capabilityChains) {
-    const matchedSignals = chain.signalIds.map((signalId) => signalMap.get(signalId)).filter(Boolean);
+    const matchedSignals = chain.signalIds
+      .map((signalId) => signalMap.get(signalId))
+      .filter(Boolean);
     if (matchedSignals.length !== chain.signalIds.length) {
       continue;
     }
@@ -1000,7 +1012,8 @@ function buildFindings(signals: ExtractedSignal[]): StaticFinding[] {
     findings.push({
       ruleId: "CG-RULE-THIRD-PARTY-CONTENT",
       severity: "medium",
-      message: "The skill processes untrusted third-party content that can carry indirect prompt injection.",
+      message:
+        "The skill processes untrusted third-party content that can carry indirect prompt injection.",
       evidence: externalContent.evidence.slice(0, MAX_EVIDENCE_PER_RULE),
       signalIds: ["external-content-input"],
       confidence: externalContent.confidence,
@@ -1012,7 +1025,8 @@ function buildFindings(signals: ExtractedSignal[]): StaticFinding[] {
     findings.push({
       ruleId: "CG-RULE-UNVERIFIABLE-DEPENDENCY",
       severity: "medium",
-      message: "The skill relies on remote dependencies or install steps that cannot be verified locally.",
+      message:
+        "The skill relies on remote dependencies or install steps that cannot be verified locally.",
       evidence: unverifiableDependency.evidence.slice(0, MAX_EVIDENCE_PER_RULE),
       signalIds: ["unverifiable-dependency"],
       confidence: unverifiableDependency.confidence,
@@ -1100,7 +1114,9 @@ function extractSecretTargets(lines: Array<{ path: string; text: string }>): str
   return unique(candidates).slice(0, MAX_HINT_COUNT);
 }
 
-function extractOutboundRequests(lines: Array<{ path: string; text: string }>): OutboundRequestHint[] {
+function extractOutboundRequests(
+  lines: Array<{ path: string; text: string }>,
+): OutboundRequestHint[] {
   const hints: OutboundRequestHint[] = [];
 
   for (const line of lines) {
@@ -1280,15 +1296,15 @@ function hasBenignExampleContext(text: string): boolean {
 }
 
 function collapseSpacedLetters(text: string): string {
-  return text.replace(/\b(?:[A-Za-z]\s+){3,}[A-Za-z]\b/gu, (match) =>
-    match.replace(/\s+/gu, ""),
-  );
+  return text.replace(/\b(?:[A-Za-z]\s+){3,}[A-Za-z]\b/gu, (match) => match.replace(/\s+/gu, ""));
 }
 
 function normalizeTypoglycemia(text: string): string {
   return text.replace(/\b[A-Za-z]{5,}\b/gu, (token) => {
     const normalized = token.toLowerCase();
-    const canonical = typoglycemiaTargets.find((target) => looksLikeTypoglycemia(normalized, target));
+    const canonical = typoglycemiaTargets.find((target) =>
+      looksLikeTypoglycemia(normalized, target),
+    );
     return canonical ?? token;
   });
 }
@@ -1393,7 +1409,8 @@ function computeRiskScore(findings: StaticFinding[]): number {
     (total, finding) => total + severityWeight[finding.severity],
     0,
   );
-  const diversityBonus = Math.max(0, new Set(findings.map((finding) => finding.ruleId)).size - 1) * 5;
+  const diversityBonus =
+    Math.max(0, new Set(findings.map((finding) => finding.ruleId)).size - 1) * 5;
   return Math.min(100, baseScore + diversityBonus);
 }
 

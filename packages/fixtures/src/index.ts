@@ -64,7 +64,8 @@ export const skillFixtureCorpus: SkillFixtureDefinition[] = [
     id: "benign-remote-content-researcher",
     slug: "remote-content-researcher",
     intent: "benign",
-    description: "Benign URL summarizer that should stay at review for third-party content exposure.",
+    description:
+      "Benign URL summarizer that should stay at review for third-party content exposure.",
     relativePath: "benign-remote-content-researcher",
     expectedRuleIds: ["CG-RULE-THIRD-PARTY-CONTENT"],
     expectedDetonationRuleIds: [],

