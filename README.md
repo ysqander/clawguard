@@ -17,7 +17,7 @@ ClawGuard is not a runtime tool-call authorization layer. It focuses on pre-inst
 
 ## What ClawGuard Does
 
-ClawGuard is built for operators who want to inspect local OpenClaw skills before trusting them.
+ClawGuard is built for OpenClaw users who want to inspect local OpenClaw skills before trusting them.
 
 Today it can:
 
@@ -136,9 +136,9 @@ In another terminal, inspect daemon health:
 clawguard status
 ```
 
-## Typical Operator Flow
+## Typical Workflow
 
-A normal operator workflow is:
+A normal workflow is:
 
 1. Start the daemon.
 2. Scan a local skill directory.
@@ -157,7 +157,7 @@ clawguard detonate example-skill --detailed
 
 ## CLI Overview
 
-ClawGuard has a small operator-facing command set:
+ClawGuard has a small command set:
 
 - `clawguard daemon`
   Starts the local daemon in the foreground.
