@@ -6,6 +6,39 @@ Sources are cited inline. Every fixture is **inert** — no real C2 IPs, no real
 
 ---
 
+## Why This Corpus Exists
+
+ClawGuard's current protections were not designed from hypothetical "AI security" examples. They were built from real OpenClaw incidents, public postmortems, academic papers, and defensive research that documented how malicious skills were actually delivered, disguised, and activated in the wild.
+
+That matters because the protection model follows the same split attackers used:
+
+- some attacks were instruction-only and relied on the agent following Markdown setup steps
+- some attacks hid payloads in comments, encoded text, or persistent memory files
+- some attacks embedded malicious behavior in otherwise functional helper code
+- some attacks depended on social engineering a human or agent into revealing secrets or entering credentials
+
+ClawGuard therefore uses both static and behavioral layers:
+
+- static analysis to catch risky capability chains before a skill is trusted
+- detonation to catch behaviors that only appear when setup steps or workflows are actually exercised
+
+The goal of this corpus is to keep the shipped protections tied to documented attack patterns, not to toy examples or one-off signatures.
+
+## Protection Model Derived from Real Cases
+
+The current rules and runtime checks map directly to the threat patterns below:
+
+- staged installers informed the staged-download and download-plus-execute detections
+- silent credential theft informed `.env`, SSH key, and honeypot exfiltration coverage
+- persistent memory and soul poisoning informed `MEMORY.md` and `SOUL.md` tampering detection
+- hidden prompt overrides informed comment, zero-width, and decoded-content normalization
+- deceptive setup dialogs informed credential-harvesting coverage
+- embedded backdoors informed reverse-shell and functional-helper analysis
+
+Appendix A at the end of this document lists the external source set that informed each scenario.
+
+---
+
 ## Scenario 1: ClawHavoc — ClickFix 2.0 Staged Installer
 
 **Source:** Koi Security "ClawHavoc" disclosure (Feb 1, 2026); Trend Micro AMOS analysis (Feb 23, 2026)
@@ -482,3 +515,53 @@ pnpm bench:static
 # malicious/prompt-injection-override   → CRITICAL (expected: CRITICAL) ✓
 # benign/benign-markdown-formatter      → PASS     (expected: PASS)     ✓
 ```
+
+---
+
+## Appendix A: Source Index
+
+This appendix records the real-world reporting and research that informed each threat scenario in this document.
+
+### Scenario 1 — ClawHavoc Staged Installer (ClickFix 2.0)
+
+- Koi Security original disclosure: <https://www.koi.ai/blog/clawhavoc-341-malicious-clawedbot-skills-found-by-the-bot-they-were-targeting>
+- Trend Micro AMOS analysis: <https://www.trendmicro.com/en_us/research/26/b/openclaw-skills-used-to-distribute-atomic-macos-stealer.html>
+- Termdock postmortem with timeline: <https://www.termdock.com/en/blog/clawhub-malicious-skills-incident>
+
+### Scenario 2 — Silent `.env` Exfiltration
+
+- CyberPress / Antiy CERT analysis: <https://cyberpress.org/clawhavoc-poisons-openclaws-clawhub-with-1184-malicious-skills/>
+- Snyk ToxicSkills audit: <https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/>
+
+### Scenario 3 — `MEMORY.md` Poisoning
+
+- Palo Alto Networks "lethal trifecta" and memory poisoning: <https://www.paloaltonetworks.com/blog/network-security/why-moltbot-may-signal-ai-crisis/>
+- Zenity persistent C2 via `SOUL.md`: <https://www.esecurityplanet.com/threats/openclaw-or-open-door-prompt-injection-creates-ai-backdoors/>
+- Academic paper "Taming OpenClaw": <https://arxiv.org/pdf/2603.11619>
+- Akamai "sticky attacks" via persistent state: <https://www.akamai.com/blog/security/clawdbot-openclaw-practical-lessons-building-secure-agents>
+
+### Scenario 4 — Reverse Shell in Functional Code
+
+- Koi Security outlier skills: <https://www.koi.ai/blog/clawhavoc-341-malicious-clawedbot-skills-found-by-the-bot-they-were-targeting>
+- eSecurity Planet on embedded backdoors in functional code: <https://www.esecurityplanet.com/threats/hundreds-of-malicious-skills-found-in-openclaws-clawhub/>
+
+### Scenario 5 — Steganographic Soul Pack
+
+- MMNTM "Soul & Evil" research: <https://www.mmntm.net/articles/openclaw-soul-evil>
+- Snyk ToxicSkills audit: <https://snyk.io/blog/toxicskills-malicious-ai-agent-skills-clawhub/>
+
+### Scenario 6 — Fake Password Dialog (`osascript`)
+
+- Trend Micro on deceptive dialogs and AMOS harvesting: <https://www.trendmicro.com/en_us/research/26/b/openclaw-skills-used-to-distribute-atomic-macos-stealer.html>
+- CyberPress / Antiy CERT on fake password input boxes: <https://cyberpress.org/clawhavoc-poisons-openclaws-clawhub-with-1184-malicious-skills/>
+
+### Scenario 7 — Prompt Injection Override
+
+- CrowdStrike prompt-injection PoC: <https://www.crowdstrike.com/en-us/blog/what-security-teams-need-to-know-about-openclaw-ai-super-agent/>
+- Snyk "From SKILL.md to Shell Access in Three Lines of Markdown": <https://snyk.io/articles/skill-md-shell-access/>
+- Penligent on persistence and `SOUL.md` modification detection: <https://www.penligent.ai/hackinglabs/the-openclaw-prompt-injection-problem-persistence-tool-hijack-and-the-security-boundary-that-doesnt-exist/>
+
+### Scenario 8 — Benign Control (False Positive Testing)
+
+- No attack source. This scenario exists as a true-negative control.
+- ClawHub skill registry for benchmark context: <https://docs.openclaw.ai/tools/clawhub>
