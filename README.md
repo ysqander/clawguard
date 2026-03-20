@@ -1,5 +1,7 @@
 # ClawGuard
 
+![ClawGuard banner](images/clawguard_gh_200326.png)
+
 ClawGuard is a local-first skill auditor for OpenClaw agents.
 
 It answers one question:
