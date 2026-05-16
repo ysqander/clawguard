@@ -176,6 +176,20 @@ clawguard report example-skill --detailed
 clawguard detonate example-skill --detailed
 ```
 
+For a real networked OpenClaw skill example, scan TweetClaw's packaged
+`SKILL.md` directory before installing or configuring the plugin:
+
+```bash
+git clone https://github.com/Xquik-dev/tweetclaw.git /tmp/tweetclaw
+clawguard scan /tmp/tweetclaw/skills/tweetclaw --detailed
+clawguard report tweetclaw --detailed
+```
+
+TweetClaw is an OpenClaw plugin for X/Twitter automation. It covers tweet
+search, reply search, posting, follower export, media workflows, direct
+messages, monitors, webhooks, and giveaway draws through Xquik. Treat the scan
+as pre-install review evidence, not a safety certificate.
+
 ## CLI Overview
 
 ClawGuard has a small command set:
